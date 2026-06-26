@@ -1,0 +1,42 @@
+<resources>
+    <string name="app_name">WhatsDel</string>
+
+    <!-- Navigation -->
+    <string name="nav_dashboard">Dashboard</string>
+    <string name="nav_messages">Messages</string>
+    <string name="nav_deleted">Deleted</string>
+    <string name="nav_settings">Settings</string>
+
+    <!-- Dashboard -->
+    <string name="dashboard_overview">Overview</string>
+    <string name="stat_total_messages">Total Messages</string>
+    <string name="stat_deleted_messages">Deleted Messages</string>
+    <string name="stat_edited_messages">Edited Messages</string>
+    <string name="stat_media_files">Media Files</string>
+
+    <!-- Messages Screen -->
+    <string name="messages_empty">No messages captured yet.</string>
+    <string name="messages_empty_subtitle">Messages will appear here once monitoring begins.</string>
+
+    <!-- Deleted Screen -->
+    <string name="deleted_empty">No deleted messages.</string>
+    <string name="deleted_empty_subtitle">Recovered deleted messages will appear here.</string>
+
+    <!-- Settings -->
+    <string name="settings_section_permissions">Permissions</string>
+    <string name="settings_section_general">General</string>
+    <string name="settings_notification_access">Notification Access</string>
+    <string name="settings_storage_permission">Storage Permission</string>
+    <string name="settings_battery_optimization">Battery Optimization</string>
+    <string name="settings_theme">Theme</string>
+    <string name="settings_theme_subtitle">Customize app appearance</string>
+    <string name="settings_backup">Backup</string>
+    <string name="settings_backup_subtitle">Export and restore your data</string>
+    <string name="settings_about">About</string>
+    <string name="settings_about_subtitle">Version, licenses, and more</string>
+
+    <!-- Permissions -->
+    <string name="permission_granted">Granted</string>
+    <string name="permission_not_granted">Not granted</string>
+    <string name="permission_enable">Enable</string>
+</resources>
