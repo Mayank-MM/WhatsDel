@@ -12,7 +12,7 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface MessageDao {
 
-    @Query("SELECT * FROM messages ORDER BY timestamp DESC")
+    @Query("SELECT * FROM messages WHERE isDeleted = 0 ORDER BY timestamp DESC")
     fun getAllMessages(): Flow<List<MessageEntity>>
 
     @Query("SELECT * FROM messages WHERE isDeleted = 1 ORDER BY timestamp DESC")
@@ -53,9 +53,10 @@ interface MessageDao {
 
     @Query("""
         SELECT * FROM messages 
-        WHERE sender LIKE '%' || :query || '%' 
+        WHERE isDeleted = 0 
+        AND (sender LIKE '%' || :query || '%' 
         OR chatName LIKE '%' || :query || '%' 
-        OR message LIKE '%' || :query || '%' 
+        OR message LIKE '%' || :query || '%')
         ORDER BY timestamp DESC
     """)
     fun searchMessages(query: String): Flow<List<MessageEntity>>

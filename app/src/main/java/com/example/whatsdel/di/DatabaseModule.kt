@@ -25,7 +25,7 @@ object DatabaseModule {
             WhatsDelDatabase::class.java,
             "whatsdel_database"
         )
-            .fallbackToDestructiveMigration()
+            .addMigrations(WhatsDelDatabase.MIGRATION_2_3)
             .build()
     }
 
