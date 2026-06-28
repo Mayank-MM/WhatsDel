@@ -33,9 +33,9 @@ class MessagesViewModel @Inject constructor(
     val uiState: StateFlow<MessagesUiState> = _searchQuery
         .flatMapLatest { query ->
             if (query.isBlank()) {
-                messageRepository.getAllMessages()
+                messageRepository.observeActiveMessages()
             } else {
-                messageRepository.searchMessages(query)
+                messageRepository.searchActiveMessages(query)
             }
         }
         .map { messages ->

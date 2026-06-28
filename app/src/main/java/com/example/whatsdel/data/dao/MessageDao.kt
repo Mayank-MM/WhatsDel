@@ -13,10 +13,10 @@ import kotlinx.coroutines.flow.Flow
 interface MessageDao {
 
     @Query("SELECT * FROM messages WHERE isDeleted = 0 ORDER BY timestamp DESC")
-    fun getAllMessages(): Flow<List<MessageEntity>>
+    fun observeActiveMessages(): Flow<List<MessageEntity>>
 
-    @Query("SELECT * FROM messages WHERE isDeleted = 1 ORDER BY timestamp DESC")
-    fun getDeletedMessages(): Flow<List<MessageEntity>>
+    @Query("SELECT * FROM messages WHERE isDeleted = 1 ORDER BY deletedTimestamp DESC")
+    fun observeDeletedMessages(): Flow<List<MessageEntity>>
 
     @Query("SELECT * FROM messages WHERE isEdited = 1 ORDER BY timestamp DESC")
     fun getEditedMessages(): Flow<List<MessageEntity>>
@@ -59,17 +59,33 @@ interface MessageDao {
         OR message LIKE '%' || :query || '%')
         ORDER BY timestamp DESC
     """)
-    fun searchMessages(query: String): Flow<List<MessageEntity>>
+    fun searchActiveMessages(query: String): Flow<List<MessageEntity>>
 
     @Query("""
         SELECT * FROM messages 
-        WHERE chatName = :chatName 
+        WHERE isDeleted = 1 
+        AND (sender LIKE '%' || :query || '%' 
+        OR chatName LIKE '%' || :query || '%' 
+        OR message LIKE '%' || :query || '%')
+        ORDER BY deletedTimestamp DESC
+    """)
+    fun searchDeletedMessages(query: String): Flow<List<MessageEntity>>
+
+    @Query("""
+        SELECT * FROM messages 
+        WHERE (chatName LIKE '%' || :chatName || '%' OR sender LIKE '%' || :chatName || '%')
         AND isDeleted = 0 
         ORDER BY timestamp DESC 
         LIMIT 1
     """)
     suspend fun findMatchingMessage(chatName: String): MessageEntity?
 
-    @Query("UPDATE messages SET isDeleted = 1, deletedTimestamp = :deletedTimestamp WHERE id = :id")
-    suspend fun markAsDeleted(id: Long, deletedTimestamp: Long)
+    @Query("SELECT * FROM messages WHERE isDeleted = 0 ORDER BY timestamp DESC LIMIT 50")
+    suspend fun getRecentActiveMessages(): List<MessageEntity>
+
+    @Query("SELECT * FROM messages WHERE notificationId = :notificationId AND isDeleted = 0 ORDER BY timestamp DESC LIMIT 1")
+    suspend fun findMessageByNotificationId(notificationId: Int): MessageEntity?
+
+    @Query("UPDATE messages SET isDeleted = :isDeleted, deletedTimestamp = :deletedTimestamp WHERE id = :id")
+    suspend fun markAsDeleted(id: Long, deletedTimestamp: Long, isDeleted: Boolean = true)
 }

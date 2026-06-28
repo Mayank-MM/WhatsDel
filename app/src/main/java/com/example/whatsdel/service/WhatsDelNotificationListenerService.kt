@@ -25,16 +25,21 @@ class WhatsDelNotificationListenerService : NotificationListenerService() {
     // Deduplication cache: hash of (sender + text) -> postTime
     private val recentMessages = mutableMapOf<Int, Long>()
 
-    // Known WhatsApp deletion indicator texts
+    // Comprehensive list of WhatsApp deletion indicator texts across versions and languages
     private val deletionIndicators = listOf(
         "this message was deleted",
-        "this message was deleted.",
         "you deleted this message",
-        "you deleted this message.",
-        "this message has been deleted",
+        "message was deleted",
+        "deleted this message",
         // Hindi
         "यह मैसेज डिलीट कर दिया गया",
-        "आपने यह मैसेज डिलीट कर दिया"
+        "आपने यह मैसेज डिलीट कर दिया",
+        // Spanish
+        "este mensaje fue eliminado",
+        "eliminaste este mensaje",
+        // Portuguese
+        "esta mensagem foi apagada",
+        "você apagou esta mensagem"
     )
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
@@ -48,26 +53,28 @@ class WhatsDelNotificationListenerService : NotificationListenerService() {
         val notification = sbn.notification ?: return
         val extras = notification.extras ?: return
 
-        // Extract information
-        val title = extras.getString(Notification.EXTRA_TITLE) ?: return
-        val text = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString() ?: return
+        // Extract information safely without early returns
+        val title = extras.getString(Notification.EXTRA_TITLE)?.trim() ?: ""
+        val text = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString()?.trim() ?: ""
+
+        // Also extract from EXTRA_TEXT_LINES as WhatsApp sometimes buries it there
+        val textLines = extras.getCharSequenceArray(Notification.EXTRA_TEXT_LINES)
+        val textLinesString = textLines?.joinToString("\n") ?: ""
+        
+        val fullText = "$text\n$textLinesString".lowercase()
+        val titleLower = title.lowercase()
 
         // WhatsApp groups usually have the group name in EXTRA_CONVERSATION_TITLE or combined in title
-        val conversationTitle = extras.getString(Notification.EXTRA_CONVERSATION_TITLE)
+        val conversationTitle = extras.getString(Notification.EXTRA_CONVERSATION_TITLE)?.trim()
         val isGroup = extras.getBoolean(Notification.EXTRA_IS_GROUP_CONVERSATION, false)
         val isSummary = (notification.flags and Notification.FLAG_GROUP_SUMMARY) != 0
 
-        // Ignore summary notifications as they don't contain individual message text
-        if (isSummary || text.isBlank()) {
-            return
-        }
-
-        // Parse sender and chat name
+        // Parse sender and chat name accurately
         val sender: String
         val chatName: String
 
         if (isGroup) {
-            chatName = conversationTitle ?: title.substringBefore(":")
+            chatName = conversationTitle ?: title.substringBefore(":").trim()
             sender = if (conversationTitle != null) {
                 title
             } else {
@@ -78,18 +85,27 @@ class WhatsDelNotificationListenerService : NotificationListenerService() {
             chatName = title
         }
 
-        // Check if the text indicates a deleted message
-        val normalizedText = text.trim().lowercase()
-        if (deletionIndicators.any { normalizedText.contains(it) }) {
+        val notificationId = sbn.id
+
+        // Check if the text OR title indicates a deleted message
+        val isDeletedText = deletionIndicators.any { fullText.contains(it) || titleLower.contains(it) }
+        val isDeletedFuzzy = (fullText.contains("deleted") && fullText.contains("message")) || 
+                             (fullText.contains("डिलीट") && fullText.contains("मैसेज"))
+
+        if (isDeletedText || isDeletedFuzzy) {
             Log.d(TAG, "Deletion detected for chat: $chatName")
-            handleDeletion(chatName)
+            handleDeletion(chatName, fullText, notificationId)
+            return
+        }
+
+        // Ignore summary notifications for regular messages
+        if (isSummary || text.isBlank()) {
             return
         }
 
         val postTime = sbn.postTime
-        val notificationId = sbn.id
 
-        // Basic deduplication: check if we've seen this exact text from this sender recently (within 5 seconds)
+        // Basic deduplication
         val hash = (sender + text).hashCode()
         val lastSeen = recentMessages[hash]
         if (lastSeen != null && (postTime - lastSeen) < 5000) {
@@ -124,14 +140,30 @@ class WhatsDelNotificationListenerService : NotificationListenerService() {
         }
     }
 
-    private fun handleDeletion(chatName: String) {
+    private fun handleDeletion(chatName: String, fullText: String, notificationId: Int) {
         serviceScope.launch {
             try {
-                val matchingMessage = messageRepository.findMatchingMessage(chatName)
+                // METHOD 1: Try exact match via Notification ID (Bulletproof for updates)
+                var matchingMessage = messageRepository.findMessageByNotificationId(notificationId)
+
+                // METHOD 2: Try exact/LIKE match by chatName
+                if (matchingMessage == null) {
+                    matchingMessage = messageRepository.findMatchingMessage(chatName)
+                }
+
+                // METHOD 3: Fuzzy fallback scanning recent messages
+                if (matchingMessage == null) {
+                    val recentMessagesList = messageRepository.getRecentActiveMessages()
+                    matchingMessage = recentMessagesList.firstOrNull { 
+                        fullText.contains(it.sender.lowercase()) || fullText.contains(it.chatName.lowercase())
+                    }
+                }
+
                 if (matchingMessage != null) {
                     messageRepository.markAsDeleted(
                         id = matchingMessage.id,
-                        deletedTimestamp = System.currentTimeMillis()
+                        deletedTimestamp = System.currentTimeMillis(),
+                        isDeleted = true
                     )
                     Log.d(TAG, "Message marked as deleted: ${matchingMessage.message}")
                 } else {
@@ -147,7 +179,6 @@ class WhatsDelNotificationListenerService : NotificationListenerService() {
         val iterator = recentMessages.iterator()
         while (iterator.hasNext()) {
             val entry = iterator.next()
-            // Remove entries older than 30 seconds
             if (currentTime - entry.value > 30000) {
                 iterator.remove()
             }
@@ -156,7 +187,5 @@ class WhatsDelNotificationListenerService : NotificationListenerService() {
 
     override fun onNotificationRemoved(sbn: StatusBarNotification) {
         super.onNotificationRemoved(sbn)
-        // WhatsApp posts replacement notifications for deletions rather than just removing,
-        // so detection is handled in onNotificationPosted above.
     }
 }

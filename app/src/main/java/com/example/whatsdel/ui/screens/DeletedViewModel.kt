@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import javax.inject.Inject
 
@@ -21,9 +22,10 @@ data class DeletedUiState(
     val sortNewestFirst: Boolean = true
 )
 
+@OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class DeletedViewModel @Inject constructor(
-    messageRepository: MessageRepository
+    private val messageRepository: MessageRepository
 ) : ViewModel() {
 
     private val _searchQuery = MutableStateFlow("")
@@ -32,25 +34,26 @@ class DeletedViewModel @Inject constructor(
     private val _sortNewestFirst = MutableStateFlow(true)
     val sortNewestFirst: StateFlow<Boolean> = _sortNewestFirst.asStateFlow()
 
+    private val _messagesFlow = _searchQuery.flatMapLatest { query ->
+        if (query.isBlank()) {
+            messageRepository.observeDeletedMessages()
+        } else {
+            messageRepository.searchDeletedMessages(query)
+        }
+    }
+
     val uiState: StateFlow<DeletedUiState> = combine(
-        messageRepository.getDeletedMessages(),
+        _messagesFlow,
         _searchQuery,
         _sortNewestFirst
     ) { messages, query, newestFirst ->
-        val filtered = if (query.isBlank()) {
-            messages
-        } else {
-            messages.filter { msg ->
-                msg.sender.contains(query, ignoreCase = true) ||
-                msg.chatName.contains(query, ignoreCase = true) ||
-                msg.message.contains(query, ignoreCase = true)
-            }
-        }
+        // Only sorting is done in-memory, DAO handles filtering and text search
         val sorted = if (newestFirst) {
-            filtered.sortedByDescending { it.deletedTimestamp ?: it.timestamp }
+            messages.sortedByDescending { it.deletedTimestamp ?: it.timestamp }
         } else {
-            filtered.sortedBy { it.deletedTimestamp ?: it.timestamp }
+            messages.sortedBy { it.deletedTimestamp ?: it.timestamp }
         }
+        
         DeletedUiState(
             deletedMessages = sorted,
             searchQuery = query,

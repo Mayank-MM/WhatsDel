@@ -5,9 +5,9 @@ import kotlinx.coroutines.flow.Flow
 
 interface MessageRepository {
 
-    fun getAllMessages(): Flow<List<MessageEntity>>
+    fun observeActiveMessages(): Flow<List<MessageEntity>>
 
-    fun getDeletedMessages(): Flow<List<MessageEntity>>
+    fun observeDeletedMessages(): Flow<List<MessageEntity>>
 
     fun getEditedMessages(): Flow<List<MessageEntity>>
 
@@ -31,9 +31,15 @@ interface MessageRepository {
 
     suspend fun deleteAllMessages()
 
-    fun searchMessages(query: String): Flow<List<MessageEntity>>
+    fun searchActiveMessages(query: String): Flow<List<MessageEntity>>
+
+    fun searchDeletedMessages(query: String): Flow<List<MessageEntity>>
 
     suspend fun findMatchingMessage(chatName: String): MessageEntity?
 
-    suspend fun markAsDeleted(id: Long, deletedTimestamp: Long)
+    suspend fun getRecentActiveMessages(): List<MessageEntity>
+
+    suspend fun findMessageByNotificationId(notificationId: Int): MessageEntity?
+
+    suspend fun markAsDeleted(id: Long, deletedTimestamp: Long, isDeleted: Boolean = true)
 }

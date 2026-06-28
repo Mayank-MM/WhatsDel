@@ -12,11 +12,11 @@ class MessageRepositoryImpl @Inject constructor(
     private val messageDao: MessageDao
 ) : MessageRepository {
 
-    override fun getAllMessages(): Flow<List<MessageEntity>> =
-        messageDao.getAllMessages()
+    override fun observeActiveMessages(): Flow<List<MessageEntity>> =
+        messageDao.observeActiveMessages()
 
-    override fun getDeletedMessages(): Flow<List<MessageEntity>> =
-        messageDao.getDeletedMessages()
+    override fun observeDeletedMessages(): Flow<List<MessageEntity>> =
+        messageDao.observeDeletedMessages()
 
     override fun getEditedMessages(): Flow<List<MessageEntity>> =
         messageDao.getEditedMessages()
@@ -51,12 +51,21 @@ class MessageRepositoryImpl @Inject constructor(
     override suspend fun deleteAllMessages() =
         messageDao.deleteAllMessages()
 
-    override fun searchMessages(query: String): Flow<List<MessageEntity>> =
-        messageDao.searchMessages(query)
+    override fun searchActiveMessages(query: String): Flow<List<MessageEntity>> =
+        messageDao.searchActiveMessages(query)
+
+    override fun searchDeletedMessages(query: String): Flow<List<MessageEntity>> =
+        messageDao.searchDeletedMessages(query)
 
     override suspend fun findMatchingMessage(chatName: String): MessageEntity? =
         messageDao.findMatchingMessage(chatName)
 
-    override suspend fun markAsDeleted(id: Long, deletedTimestamp: Long) =
-        messageDao.markAsDeleted(id, deletedTimestamp)
+    override suspend fun getRecentActiveMessages(): List<MessageEntity> =
+        messageDao.getRecentActiveMessages()
+
+    override suspend fun findMessageByNotificationId(notificationId: Int): MessageEntity? =
+        messageDao.findMessageByNotificationId(notificationId)
+
+    override suspend fun markAsDeleted(id: Long, deletedTimestamp: Long, isDeleted: Boolean) =
+        messageDao.markAsDeleted(id, deletedTimestamp, isDeleted)
 }
