@@ -6,6 +6,9 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
+import androidx.lifecycle.viewModelScope
 import javax.inject.Inject
 
 data class DashboardUiState(
@@ -21,9 +24,13 @@ class DashboardViewModel @Inject constructor(
     private val messageRepository: MessageRepository
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(DashboardUiState())
-    val uiState: StateFlow<DashboardUiState> = _uiState.asStateFlow()
-
-    // In Phase 2, this will collect real data from the repository via Flow.
-    // For now, the default fake values in DashboardUiState are used.
+    val uiState: StateFlow<DashboardUiState> = messageRepository.getMessageCount()
+        .map { totalCount ->
+            DashboardUiState(totalMessages = totalCount)
+        }
+        .stateIn(
+            scope = viewModelScope,
+            started = kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5_000),
+            initialValue = DashboardUiState(totalMessages = 0)
+        )
 }

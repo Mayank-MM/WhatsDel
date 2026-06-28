@@ -6,6 +6,8 @@ data class Message(
     val chatName: String,
     val message: String,
     val timestamp: Long,
+    val packageName: String,
+    val notificationId: Int,
     val messageType: String,
     val isDeleted: Boolean = false,
     val isEdited: Boolean = false,

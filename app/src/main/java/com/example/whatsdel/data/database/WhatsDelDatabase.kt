@@ -7,7 +7,7 @@ import com.example.whatsdel.data.entity.MessageEntity
 
 @Database(
     entities = [MessageEntity::class],
-    version = 1,
+    version = 2,
     exportSchema = true
 )
 abstract class WhatsDelDatabase : RoomDatabase() {

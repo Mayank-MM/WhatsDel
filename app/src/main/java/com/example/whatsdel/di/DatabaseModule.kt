@@ -24,7 +24,9 @@ object DatabaseModule {
             context,
             WhatsDelDatabase::class.java,
             "whatsdel_database"
-        ).build()
+        )
+            .fallbackToDestructiveMigration()
+            .build()
     }
 
     @Provides

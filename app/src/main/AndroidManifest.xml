@@ -26,8 +26,7 @@
             </intent-filter>
         </activity>
 
-        <!-- Placeholder for Phase 2: NotificationListenerService -->
-        <!--
+        <!-- Phase 2: NotificationListenerService -->
         <service
             android:name=".service.WhatsDelNotificationListenerService"
             android:exported="true"
@@ -36,7 +35,6 @@
                 <action android:name="android.service.notification.NotificationListenerService" />
             </intent-filter>
         </service>
-        -->
     </application>
 
 </manifest>
