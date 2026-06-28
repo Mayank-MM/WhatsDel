@@ -50,4 +50,25 @@ interface MessageDao {
 
     @Query("DELETE FROM messages")
     suspend fun deleteAllMessages()
+
+    @Query("""
+        SELECT * FROM messages 
+        WHERE sender LIKE '%' || :query || '%' 
+        OR chatName LIKE '%' || :query || '%' 
+        OR message LIKE '%' || :query || '%' 
+        ORDER BY timestamp DESC
+    """)
+    fun searchMessages(query: String): Flow<List<MessageEntity>>
+
+    @Query("""
+        SELECT * FROM messages 
+        WHERE chatName = :chatName 
+        AND isDeleted = 0 
+        ORDER BY timestamp DESC 
+        LIMIT 1
+    """)
+    suspend fun findMatchingMessage(chatName: String): MessageEntity?
+
+    @Query("UPDATE messages SET isDeleted = 1, deletedTimestamp = :deletedTimestamp WHERE id = :id")
+    suspend fun markAsDeleted(id: Long, deletedTimestamp: Long)
 }

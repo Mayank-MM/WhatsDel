@@ -1,12 +1,18 @@
 # WhatsDel
 
-WhatsDel is a modern Android application designed to safely capture, manage, and recover deleted messages and media from notifications. Built with Kotlin and Jetpack Compose, it features a robust, reactive architecture.
+WhatsDel is a modern Android application that recovers deleted WhatsApp messages. It silently captures incoming WhatsApp notifications and stores them locally. When the sender deletes a message, WhatsDel preserves the original content — completely offline, with no cloud or server dependency.
 
 ## 🚀 Features
-- **Modern Dashboard**: High-level overview of message statistics (total, deleted, edited, and media).
-- **Messages & Deleted Views**: Dedicated screens for viewing captured notifications and recovered content.
-- **Settings & Permissions Hub**: Centralized system for managing essential app permissions (Notification Access, Storage, Battery Optimization) directly linked to system settings.
-- **Material 3 Design**: Fully custom, responsive, and dynamic UI using the latest Material Design 3 guidelines.
+- **Deleted Message Recovery**: Automatically detects when WhatsApp replaces a message with "This message was deleted" and preserves the original text.
+- **Real-time Notification Monitoring**: Background service captures every incoming WhatsApp text message via `NotificationListenerService`.
+- **Live Dashboard**: Displays total captured messages and deleted messages count, updated in real-time.
+- **Messages Feed**: Browse all captured messages with sender, chat name, preview, timestamp, and a "Deleted" badge for recovered messages.
+- **Deleted Messages Screen**: Dedicated view showing only recovered messages with original text, capture time, deletion time, search, and sort.
+- **Search**: Full-text search across sender, chat name, and message content on both Messages and Deleted screens.
+- **Smart Deduplication**: Prevents duplicate entries when WhatsApp pushes the same notification multiple times.
+- **Group Chat Support**: Correctly separates sender name from group chat name.
+- **Permission Management**: Guides the user through enabling Notification Access, Storage, and Battery Optimization with direct links to system settings.
+- **Material 3 Design**: Modern UI with dynamic colors, dark mode support, and responsive layouts.
 
 ## 🛠️ Tech Stack
 - **Language**: Kotlin 2.0
@@ -25,10 +31,10 @@ app/src/main/java/com/example/whatsdel/
  ├── di/              # Hilt Modules for Dependency Injection
  ├── domain/          # Domain Models and Repository Interfaces
  ├── navigation/      # NavGraph and Screen route definitions
- ├── service/         # Background services (NotificationListenerService placeholder)
+ ├── service/         # NotificationListenerService for message capture & deletion detection
  ├── ui/              
- │    ├── components/ # Reusable Compose UI widgets
- │    ├── screens/    # Main application screens and ViewModels
+ │    ├── components/ # Reusable Compose widgets (MessageItem, DeletedMessageItem, StatCard, etc.)
+ │    ├── screens/    # Main screens and ViewModels (Dashboard, Messages, Deleted, Settings)
  │    └── theme/      # Material 3 colors, typography, and theme definitions
  └── utils/           # Helper classes (Permissions, Date formatting)
 ```
@@ -56,11 +62,11 @@ adb shell am start -n "com.example.whatsdel/.MainActivity" -a android.intent.act
 ```
 
 ## 🔒 Permissions Required
-To function correctly, WhatsDel requires:
-- **Notification Access**: To capture incoming messages.
-- **Storage Access**: To save media files safely.
-- **Ignore Battery Optimization**: To ensure the background monitoring service is not killed by the Android system.
+- **Notification Access**: To capture incoming WhatsApp messages and detect deletions.
+- **Storage Access**: To save data safely.
+- **Ignore Battery Optimization**: To keep the background monitoring service running reliably.
 
 ## 🗺️ Project Roadmap
 - **Phase 1 (Completed)**: Project foundation, UI architecture, Jetpack Compose screens, and Room database setup.
-- **Phase 2 (Upcoming)**: Core notification monitoring (`NotificationListenerService`) and deleted message recovery logic.
+- **Phase 2 (Completed)**: Real-time notification monitoring and message capture via `NotificationListenerService`.
+- **Phase 3 (Completed)**: Deleted message detection, recovery, search, sort, and Settings with DB statistics.

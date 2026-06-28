@@ -22,8 +22,20 @@ class WhatsDelNotificationListenerService : NotificationListenerService() {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val TAG = "WhatsDelService"
 
-    // Deduplication cache: combination of sender + text to prevent duplicate inserts
+    // Deduplication cache: hash of (sender + text) -> postTime
     private val recentMessages = mutableMapOf<Int, Long>()
+
+    // Known WhatsApp deletion indicator texts
+    private val deletionIndicators = listOf(
+        "this message was deleted",
+        "this message was deleted.",
+        "you deleted this message",
+        "you deleted this message.",
+        "this message has been deleted",
+        // Hindi
+        "यह मैसेज डिलीट कर दिया गया",
+        "आपने यह मैसेज डिलीट कर दिया"
+    )
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
         val packageName = sbn.packageName
@@ -39,7 +51,7 @@ class WhatsDelNotificationListenerService : NotificationListenerService() {
         // Extract information
         val title = extras.getString(Notification.EXTRA_TITLE) ?: return
         val text = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString() ?: return
-        
+
         // WhatsApp groups usually have the group name in EXTRA_CONVERSATION_TITLE or combined in title
         val conversationTitle = extras.getString(Notification.EXTRA_CONVERSATION_TITLE)
         val isGroup = extras.getBoolean(Notification.EXTRA_IS_GROUP_CONVERSATION, false)
@@ -66,6 +78,14 @@ class WhatsDelNotificationListenerService : NotificationListenerService() {
             chatName = title
         }
 
+        // Check if the text indicates a deleted message
+        val normalizedText = text.trim().lowercase()
+        if (deletionIndicators.any { normalizedText.contains(it) }) {
+            Log.d(TAG, "Deletion detected for chat: $chatName")
+            handleDeletion(chatName)
+            return
+        }
+
         val postTime = sbn.postTime
         val notificationId = sbn.id
 
@@ -76,7 +96,7 @@ class WhatsDelNotificationListenerService : NotificationListenerService() {
             Log.d(TAG, "Duplicate message ignored: $sender - $text")
             return
         }
-        
+
         // Update cache and clean old entries
         recentMessages[hash] = postTime
         cleanOldCache(postTime)
@@ -93,13 +113,32 @@ class WhatsDelNotificationListenerService : NotificationListenerService() {
             isEdited = false
         )
 
-        Log.d(TAG, "Saving message: $messageEntity")
+        Log.d(TAG, "Saving message: $sender in $chatName: $text")
 
         serviceScope.launch {
             try {
                 messageRepository.insertMessage(messageEntity)
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to save message", e)
+            }
+        }
+    }
+
+    private fun handleDeletion(chatName: String) {
+        serviceScope.launch {
+            try {
+                val matchingMessage = messageRepository.findMatchingMessage(chatName)
+                if (matchingMessage != null) {
+                    messageRepository.markAsDeleted(
+                        id = matchingMessage.id,
+                        deletedTimestamp = System.currentTimeMillis()
+                    )
+                    Log.d(TAG, "Message marked as deleted: ${matchingMessage.message}")
+                } else {
+                    Log.d(TAG, "No matching message found for deletion in chat: $chatName")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to handle deletion", e)
             }
         }
     }
@@ -117,6 +156,7 @@ class WhatsDelNotificationListenerService : NotificationListenerService() {
 
     override fun onNotificationRemoved(sbn: StatusBarNotification) {
         super.onNotificationRemoved(sbn)
-        // Future Phase: Check if notification was removed abruptly (potential delete)
+        // WhatsApp posts replacement notifications for deletions rather than just removing,
+        // so detection is handled in onNotificationPosted above.
     }
 }

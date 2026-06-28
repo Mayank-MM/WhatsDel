@@ -30,4 +30,10 @@ interface MessageRepository {
     suspend fun deleteMessage(message: MessageEntity)
 
     suspend fun deleteAllMessages()
+
+    fun searchMessages(query: String): Flow<List<MessageEntity>>
+
+    suspend fun findMatchingMessage(chatName: String): MessageEntity?
+
+    suspend fun markAsDeleted(id: Long, deletedTimestamp: Long)
 }

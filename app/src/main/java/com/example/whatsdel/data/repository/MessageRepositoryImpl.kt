@@ -50,4 +50,13 @@ class MessageRepositoryImpl @Inject constructor(
 
     override suspend fun deleteAllMessages() =
         messageDao.deleteAllMessages()
+
+    override fun searchMessages(query: String): Flow<List<MessageEntity>> =
+        messageDao.searchMessages(query)
+
+    override suspend fun findMatchingMessage(chatName: String): MessageEntity? =
+        messageDao.findMatchingMessage(chatName)
+
+    override suspend fun markAsDeleted(id: Long, deletedTimestamp: Long) =
+        messageDao.markAsDeleted(id, deletedTimestamp)
 }

@@ -22,7 +22,7 @@ import com.example.whatsdel.data.entity.MessageEntity
 import com.example.whatsdel.utils.DateUtils
 
 @Composable
-fun MessageItem(
+fun DeletedMessageItem(
     message: MessageEntity,
     modifier: Modifier = Modifier
 ) {
@@ -33,7 +33,7 @@ fun MessageItem(
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 6.dp),
         shape = RoundedCornerShape(16.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+        color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f),
         tonalElevation = 0.dp
     ) {
         Row(
@@ -42,24 +42,25 @@ fun MessageItem(
                 .fillMaxWidth(),
             verticalAlignment = Alignment.Top
         ) {
-            // Avatar Placeholder
+            // Avatar
             Box(
                 modifier = Modifier
                     .size(48.dp)
                     .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primaryContainer),
+                    .background(MaterialTheme.colorScheme.error.copy(alpha = 0.15f)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = if (isGroup) Icons.Default.Group else Icons.Default.Person,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onPrimaryContainer
+                    tint = MaterialTheme.colorScheme.error
                 )
             }
 
             Spacer(modifier = Modifier.width(16.dp))
 
             Column(modifier = Modifier.weight(1f)) {
+                // Header row: chat name + deleted badge
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -75,44 +76,61 @@ fun MessageItem(
                         modifier = Modifier.weight(1f)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
-                    if (message.isDeleted) {
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = MaterialTheme.colorScheme.error
-                        ) {
-                            Text(
-                                text = "Deleted",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onError,
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(6.dp))
+                    // Deleted badge
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.error
+                    ) {
+                        Text(
+                            text = "Deleted",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onError,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                        )
                     }
-                    Text(
-                        text = DateUtils.formatTime(message.timestamp),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
                 }
 
+                // Sender in group
                 if (isGroup) {
                     Text(
                         text = "~ ${message.sender}",
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary,
+                        color = MaterialTheme.colorScheme.error.copy(alpha = 0.8f),
                         modifier = Modifier.padding(bottom = 2.dp)
                     )
                 }
 
+                // Original message text
                 Text(
                     text = message.message,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 4,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.padding(top = 4.dp)
                 )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Timestamps row
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = "Captured: ${DateUtils.formatTime(message.timestamp)}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    message.deletedTimestamp?.let { deletedAt ->
+                        Text(
+                            text = "Deleted: ${DateUtils.formatTime(deletedAt)}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.error.copy(alpha = 0.8f)
+                        )
+                    }
+                }
             }
         }
     }

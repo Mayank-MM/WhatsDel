@@ -9,9 +9,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Delete
-import androidx.compose.material.icons.outlined.EditNote
 import androidx.compose.material.icons.outlined.Message
-import androidx.compose.material.icons.outlined.PermMedia
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -26,8 +24,6 @@ import com.example.whatsdel.R
 import com.example.whatsdel.ui.components.LoadingIndicator
 import com.example.whatsdel.ui.components.StatCard
 import com.example.whatsdel.ui.theme.StatDeletedColor
-import com.example.whatsdel.ui.theme.StatEditedColor
-import com.example.whatsdel.ui.theme.StatMediaColor
 import com.example.whatsdel.ui.theme.StatTotalColor
 
 @Composable
@@ -74,22 +70,6 @@ fun DashboardScreen(
                     value = uiState.deletedMessages,
                     icon = Icons.Outlined.Delete,
                     accentColor = StatDeletedColor
-                )
-            }
-            item {
-                StatCard(
-                    title = stringResource(R.string.stat_edited_messages),
-                    value = uiState.editedMessages,
-                    icon = Icons.Outlined.EditNote,
-                    accentColor = StatEditedColor
-                )
-            }
-            item {
-                StatCard(
-                    title = stringResource(R.string.stat_media_files),
-                    value = uiState.mediaFiles,
-                    icon = Icons.Outlined.PermMedia,
-                    accentColor = StatMediaColor
                 )
             }
         }
