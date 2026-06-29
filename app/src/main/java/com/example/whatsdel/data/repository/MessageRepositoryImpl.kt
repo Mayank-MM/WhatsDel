@@ -36,6 +36,28 @@ class MessageRepositoryImpl @Inject constructor(
     override fun getMediaCount(): Flow<Int> =
         messageDao.getMediaCount()
 
+    // Phase 4: Media
+    override fun observeAllMedia(): Flow<List<MessageEntity>> =
+        messageDao.observeAllMedia()
+
+    override fun observeMediaByType(type: String): Flow<List<MessageEntity>> =
+        messageDao.observeMediaByType(type)
+
+    override fun getImageCount(): Flow<Int> =
+        messageDao.getImageCount()
+
+    override fun getVideoCount(): Flow<Int> =
+        messageDao.getVideoCount()
+
+    override fun getAudioCount(): Flow<Int> =
+        messageDao.getAudioCount()
+
+    override fun getStickerCount(): Flow<Int> =
+        messageDao.getStickerCount()
+
+    override fun searchMedia(query: String): Flow<List<MessageEntity>> =
+        messageDao.searchMedia(query)
+
     override suspend fun insertMessage(message: MessageEntity): Long =
         messageDao.insertMessage(message)
 
@@ -68,4 +90,7 @@ class MessageRepositoryImpl @Inject constructor(
 
     override suspend fun markAsDeleted(id: Long, deletedTimestamp: Long, isDeleted: Boolean) =
         messageDao.markAsDeleted(id, deletedTimestamp, isDeleted)
+
+    override suspend fun getMessageById(id: Long): MessageEntity? =
+        messageDao.getMessageById(id)
 }

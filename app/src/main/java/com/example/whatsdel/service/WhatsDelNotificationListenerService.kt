@@ -1,11 +1,13 @@
 package com.example.whatsdel.service
 
 import android.app.Notification
+import android.graphics.Bitmap
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import android.util.Log
 import com.example.whatsdel.data.entity.MessageEntity
 import com.example.whatsdel.domain.repository.MessageRepository
+import com.example.whatsdel.utils.MediaStorageHelper
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -40,6 +42,14 @@ class WhatsDelNotificationListenerService : NotificationListenerService() {
         // Portuguese
         "esta mensagem foi apagada",
         "você apagou esta mensagem"
+    )
+
+    // Media detection patterns (WhatsApp uses these emoji+text combos in notifications)
+    private val mediaPatterns = mapOf(
+        "image" to listOf("📷 photo", "📷 image", "photo", "image"),
+        "video" to listOf("📹 video", "🎥 video", "video"),
+        "voice_note" to listOf("🎤 voice message", "🎵 audio", "voice message", "🎤", "ptt"),
+        "sticker" to listOf("sticker")
     )
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
@@ -117,19 +127,114 @@ class WhatsDelNotificationListenerService : NotificationListenerService() {
         recentMessages[hash] = postTime
         cleanOldCache(postTime)
 
+        // Detect media type from notification content
+        val detectedMediaType = detectMediaType(text, fullText)
+        val hasMedia = detectedMediaType != null
+
+        // Extract thumbnail bitmap safely (handling both Bitmap and Icon types)
+        fun extractBitmapFromExtras(key: String): Bitmap? {
+            return try {
+                val obj = extras.get(key)
+                when (obj) {
+                    is Bitmap -> obj
+                    is android.graphics.drawable.Icon -> {
+                        val drawable = obj.loadDrawable(this@WhatsDelNotificationListenerService)
+                        if (drawable is android.graphics.drawable.BitmapDrawable) {
+                            drawable.bitmap
+                        } else if (drawable != null) {
+                            val bmp = Bitmap.createBitmap(
+                                drawable.intrinsicWidth.takeIf { it > 0 } ?: 500,
+                                drawable.intrinsicHeight.takeIf { it > 0 } ?: 500,
+                                Bitmap.Config.ARGB_8888
+                            )
+                            val canvas = android.graphics.Canvas(bmp)
+                            drawable.setBounds(0, 0, canvas.width, canvas.height)
+                            drawable.draw(canvas)
+                            bmp
+                        } else null
+                    }
+                    else -> null
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error extracting bitmap for $key", e)
+                null
+            }
+        }
+
+        var mediaBitmap = extractBitmapFromExtras(Notification.EXTRA_PICTURE)
+
+        // WhatsApp often uses MessagingStyle for images. Try to extract from dataUri if available
+        if (mediaBitmap == null) {
+            val messagingStyle = androidx.core.app.NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(notification)
+            if (messagingStyle != null) {
+                for (msg in messagingStyle.messages) {
+                    val uri = msg.dataUri
+                    if (uri != null) {
+                        try {
+                            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+                                val source = android.graphics.ImageDecoder.createSource(contentResolver, uri)
+                                mediaBitmap = android.graphics.ImageDecoder.decodeBitmap(source)
+                            } else {
+                                @Suppress("DEPRECATION")
+                                mediaBitmap = android.provider.MediaStore.Images.Media.getBitmap(contentResolver, uri)
+                            }
+                            if (mediaBitmap != null) break
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Error loading image from MessagingStyle URI", e)
+                        }
+                    }
+                }
+            }
+        }
+
+        var thumbnailPath: String? = null
+
+        if (hasMedia && mediaBitmap != null) {
+            val fileName = MediaStorageHelper.generateFileName(sender, postTime, detectedMediaType!!)
+            thumbnailPath = MediaStorageHelper.saveThumbnail(applicationContext, mediaBitmap, fileName)
+            Log.d(TAG, "Media thumbnail saved: $thumbnailPath")
+        }
+
+        // Determine the caption (for media messages, the text is often a caption)
+        val messageText = if (hasMedia) {
+            // If text is just the media indicator, set message to the media type label
+            val textLower = text.lowercase()
+            val isOnlyIndicator = mediaPatterns.values.flatten().any { textLower == it }
+            if (isOnlyIndicator) {
+                "${detectedMediaType?.replaceFirstChar { it.uppercase() }} received"
+            } else {
+                text // It's a caption
+            }
+        } else {
+            text
+        }
+
         val messageEntity = MessageEntity(
             sender = sender,
             chatName = chatName,
-            message = text,
+            message = messageText,
             timestamp = postTime,
             packageName = packageName,
             notificationId = notificationId,
-            messageType = "text",
+            messageType = if (hasMedia) "media" else "text",
             isDeleted = false,
-            isEdited = false
+            isEdited = false,
+            hasMedia = hasMedia,
+            mediaType = detectedMediaType,
+            mediaUri = null,
+            mediaMimeType = when (detectedMediaType) {
+                "image" -> "image/jpeg"
+                "video" -> "video/mp4"
+                "voice_note" -> "audio/ogg"
+                "sticker" -> "image/webp"
+                else -> null
+            },
+            mediaFileName = if (hasMedia) MediaStorageHelper.generateFileName(sender, postTime, detectedMediaType!!) else null,
+            mediaSize = null,
+            thumbnailPath = thumbnailPath
         )
 
-        Log.d(TAG, "Saving message: $sender in $chatName: $text")
+        Log.d(TAG, "Saving message: $sender in $chatName: $messageText (media: $hasMedia, type: $detectedMediaType)")
 
         serviceScope.launch {
             try {
@@ -138,6 +243,28 @@ class WhatsDelNotificationListenerService : NotificationListenerService() {
                 Log.e(TAG, "Failed to save message", e)
             }
         }
+    }
+
+    /**
+     * Detects media type from the notification text.
+     * Returns: "image", "video", "voice_note", "sticker", or null for plain text.
+     */
+    private fun detectMediaType(text: String, fullText: String): String? {
+        val textLower = text.lowercase()
+
+        // Check each media pattern
+        for ((type, patterns) in mediaPatterns) {
+            if (patterns.any { textLower.contains(it) || fullText.contains(it) }) {
+                return type
+            }
+        }
+
+        // Additional heuristic: WhatsApp sometimes sends "📷" alone for photos
+        if (textLower.contains("📷") || textLower.contains("\uD83D\uDCF7")) return "image"
+        if (textLower.contains("📹") || textLower.contains("🎥")) return "video"
+        if (textLower.contains("🎤")) return "voice_note"
+
+        return null
     }
 
     private fun handleDeletion(chatName: String, fullText: String, notificationId: Int) {

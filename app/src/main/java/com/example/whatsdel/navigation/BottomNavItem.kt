@@ -4,10 +4,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Message
+import androidx.compose.material.icons.filled.PermMedia
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.Dashboard
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Message
+import androidx.compose.material.icons.outlined.PermMedia
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.example.whatsdel.R
@@ -31,6 +33,12 @@ val bottomNavItems = listOf(
         selectedIcon = Icons.Filled.Message,
         unselectedIcon = Icons.Outlined.Message,
         route = Screen.Messages.route
+    ),
+    BottomNavItem(
+        titleResId = R.string.nav_media,
+        selectedIcon = Icons.Filled.PermMedia,
+        unselectedIcon = Icons.Outlined.PermMedia,
+        route = Screen.Media.createRoute()
     ),
     BottomNavItem(
         titleResId = R.string.nav_deleted,

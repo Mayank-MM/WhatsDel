@@ -75,3 +75,15 @@ val StatTotalColorDark = Color(0xFF54DBC6)
 val StatDeletedColorDark = Color(0xFFEF5350)
 val StatEditedColorDark = Color(0xFFFFB74D)
 val StatMediaColorDark = Color(0xFF7986CB)
+
+// Media type stat card colors
+val StatImageColor = Color(0xFF43A047)
+val StatVideoColor = Color(0xFFE53935)
+val StatAudioColor = Color(0xFFFF9800)
+val StatStickerColor = Color(0xFF8E24AA)
+
+val StatImageColorDark = Color(0xFF66BB6A)
+val StatVideoColorDark = Color(0xFFEF5350)
+val StatAudioColorDark = Color(0xFFFFB74D)
+val StatStickerColorDark = Color(0xFFBA68C8)
+

@@ -21,6 +21,21 @@ interface MessageRepository {
 
     fun getMediaCount(): Flow<Int>
 
+    // Phase 4: Media
+    fun observeAllMedia(): Flow<List<MessageEntity>>
+
+    fun observeMediaByType(type: String): Flow<List<MessageEntity>>
+
+    fun getImageCount(): Flow<Int>
+
+    fun getVideoCount(): Flow<Int>
+
+    fun getAudioCount(): Flow<Int>
+
+    fun getStickerCount(): Flow<Int>
+
+    fun searchMedia(query: String): Flow<List<MessageEntity>>
+
     suspend fun insertMessage(message: MessageEntity): Long
 
     suspend fun insertMessages(messages: List<MessageEntity>)
@@ -42,4 +57,6 @@ interface MessageRepository {
     suspend fun findMessageByNotificationId(notificationId: Int): MessageEntity?
 
     suspend fun markAsDeleted(id: Long, deletedTimestamp: Long, isDeleted: Boolean = true)
+
+    suspend fun getMessageById(id: Long): MessageEntity?
 }

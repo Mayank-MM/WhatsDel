@@ -41,11 +41,13 @@ class MainActivity : ComponentActivity() {
                 val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
 
                 // Map the current route to the appropriate screen title
-                val currentTitle = when (currentRoute) {
-                    Screen.Dashboard.route -> stringResource(R.string.nav_dashboard)
-                    Screen.Messages.route -> stringResource(R.string.nav_messages)
-                    Screen.Deleted.route -> stringResource(R.string.nav_deleted)
-                    Screen.Settings.route -> stringResource(R.string.nav_settings)
+                val currentTitle = when {
+                    currentRoute == Screen.Dashboard.route -> stringResource(R.string.nav_dashboard)
+                    currentRoute == Screen.Messages.route -> stringResource(R.string.nav_messages)
+                    currentRoute == Screen.Deleted.route -> stringResource(R.string.nav_deleted)
+                    currentRoute == Screen.Settings.route -> stringResource(R.string.nav_settings)
+                    currentRoute?.startsWith("media_viewer") == true -> stringResource(R.string.nav_media)
+                    currentRoute?.startsWith("media") == true -> stringResource(R.string.nav_media)
                     else -> stringResource(R.string.app_name)
                 }
 

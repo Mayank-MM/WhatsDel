@@ -86,6 +86,10 @@ dependencies {
     ksp(libs.hilt.android.compiler)
     implementation(libs.hilt.navigation.compose)
 
+    // Coil (Image Loading)
+    implementation(libs.coil.compose)
+    implementation(libs.coil.video)
+
     // Local tests
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)

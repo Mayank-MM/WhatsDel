@@ -36,6 +36,35 @@ interface MessageDao {
     @Query("SELECT COUNT(*) FROM messages WHERE mediaPath IS NOT NULL")
     fun getMediaCount(): Flow<Int>
 
+    // Phase 4: Media queries
+    @Query("SELECT * FROM messages WHERE hasMedia = 1 ORDER BY timestamp DESC")
+    fun observeAllMedia(): Flow<List<MessageEntity>>
+
+    @Query("SELECT * FROM messages WHERE hasMedia = 1 AND mediaType = :type ORDER BY timestamp DESC")
+    fun observeMediaByType(type: String): Flow<List<MessageEntity>>
+
+    @Query("SELECT COUNT(*) FROM messages WHERE hasMedia = 1 AND mediaType = 'image'")
+    fun getImageCount(): Flow<Int>
+
+    @Query("SELECT COUNT(*) FROM messages WHERE hasMedia = 1 AND mediaType = 'video'")
+    fun getVideoCount(): Flow<Int>
+
+    @Query("SELECT COUNT(*) FROM messages WHERE hasMedia = 1 AND mediaType IN ('audio', 'voice_note')")
+    fun getAudioCount(): Flow<Int>
+
+    @Query("SELECT COUNT(*) FROM messages WHERE hasMedia = 1 AND mediaType = 'sticker'")
+    fun getStickerCount(): Flow<Int>
+
+    @Query("""
+        SELECT * FROM messages WHERE hasMedia = 1
+        AND (sender LIKE '%' || :query || '%'
+            OR chatName LIKE '%' || :query || '%'
+            OR message LIKE '%' || :query || '%'
+            OR mediaFileName LIKE '%' || :query || '%')
+        ORDER BY timestamp DESC
+    """)
+    fun searchMedia(query: String): Flow<List<MessageEntity>>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertMessage(message: MessageEntity): Long
 
@@ -88,4 +117,7 @@ interface MessageDao {
 
     @Query("UPDATE messages SET isDeleted = :isDeleted, deletedTimestamp = :deletedTimestamp WHERE id = :id")
     suspend fun markAsDeleted(id: Long, deletedTimestamp: Long, isDeleted: Boolean = true)
+
+    @Query("SELECT * FROM messages WHERE id = :id")
+    suspend fun getMessageById(id: Long): MessageEntity?
 }

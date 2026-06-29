@@ -9,7 +9,11 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Image
+import androidx.compose.material.icons.outlined.Mic
 import androidx.compose.material.icons.outlined.Message
+import androidx.compose.material.icons.outlined.StickyNote2
+import androidx.compose.material.icons.outlined.Videocam
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -23,8 +27,12 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.whatsdel.R
 import com.example.whatsdel.ui.components.LoadingIndicator
 import com.example.whatsdel.ui.components.StatCard
+import com.example.whatsdel.ui.theme.StatAudioColor
 import com.example.whatsdel.ui.theme.StatDeletedColor
+import com.example.whatsdel.ui.theme.StatImageColor
+import com.example.whatsdel.ui.theme.StatStickerColor
 import com.example.whatsdel.ui.theme.StatTotalColor
+import com.example.whatsdel.ui.theme.StatVideoColor
 
 @Composable
 fun DashboardScreen(
@@ -70,6 +78,38 @@ fun DashboardScreen(
                     value = uiState.deletedMessages,
                     icon = Icons.Outlined.Delete,
                     accentColor = StatDeletedColor
+                )
+            }
+            item {
+                StatCard(
+                    title = stringResource(R.string.stat_images),
+                    value = uiState.imageCount,
+                    icon = Icons.Outlined.Image,
+                    accentColor = StatImageColor
+                )
+            }
+            item {
+                StatCard(
+                    title = stringResource(R.string.stat_videos),
+                    value = uiState.videoCount,
+                    icon = Icons.Outlined.Videocam,
+                    accentColor = StatVideoColor
+                )
+            }
+            item {
+                StatCard(
+                    title = stringResource(R.string.stat_audio),
+                    value = uiState.audioCount,
+                    icon = Icons.Outlined.Mic,
+                    accentColor = StatAudioColor
+                )
+            }
+            item {
+                StatCard(
+                    title = stringResource(R.string.stat_stickers),
+                    value = uiState.stickerCount,
+                    icon = Icons.Outlined.StickyNote2,
+                    accentColor = StatStickerColor
                 )
             }
         }

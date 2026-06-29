@@ -13,6 +13,10 @@ import javax.inject.Inject
 data class DashboardUiState(
     val totalMessages: Int = 0,
     val deletedMessages: Int = 0,
+    val imageCount: Int = 0,
+    val videoCount: Int = 0,
+    val audioCount: Int = 0,
+    val stickerCount: Int = 0,
     val isLoading: Boolean = false
 )
 
@@ -23,11 +27,19 @@ class DashboardViewModel @Inject constructor(
 
     val uiState: StateFlow<DashboardUiState> = combine(
         messageRepository.getMessageCount(),
-        messageRepository.getDeletedCount()
-    ) { totalCount, deletedCount ->
+        messageRepository.getDeletedCount(),
+        messageRepository.getImageCount(),
+        messageRepository.getVideoCount(),
+        messageRepository.getAudioCount(),
+        messageRepository.getStickerCount()
+    ) { counts ->
         DashboardUiState(
-            totalMessages = totalCount,
-            deletedMessages = deletedCount
+            totalMessages = counts[0],
+            deletedMessages = counts[1],
+            imageCount = counts[2],
+            videoCount = counts[3],
+            audioCount = counts[4],
+            stickerCount = counts[5]
         )
     }.stateIn(
         scope = viewModelScope,
