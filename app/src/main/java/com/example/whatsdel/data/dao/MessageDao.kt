@@ -102,6 +102,17 @@ interface MessageDao {
 
     @Query("""
         SELECT * FROM messages 
+        WHERE isEdited = 1 
+        AND (sender LIKE '%' || :query || '%' 
+        OR chatName LIKE '%' || :query || '%' 
+        OR message LIKE '%' || :query || '%'
+        OR originalMessage LIKE '%' || :query || '%')
+        ORDER BY editedAt DESC
+    """)
+    fun searchEditedMessages(query: String): Flow<List<MessageEntity>>
+
+    @Query("""
+        SELECT * FROM messages 
         WHERE (chatName LIKE '%' || :chatName || '%' OR sender LIKE '%' || :chatName || '%')
         AND isDeleted = 0 
         ORDER BY timestamp DESC 
@@ -115,8 +126,21 @@ interface MessageDao {
     @Query("SELECT * FROM messages WHERE notificationId = :notificationId AND isDeleted = 0 ORDER BY timestamp DESC LIMIT 1")
     suspend fun findMessageByNotificationId(notificationId: Int): MessageEntity?
 
+    @Query("SELECT * FROM messages WHERE sender = :sender AND notificationId = :notificationId AND isDeleted = 0 ORDER BY timestamp DESC LIMIT 1")
+    suspend fun findMessageBySenderAndNotificationId(sender: String, notificationId: Int): MessageEntity?
+
     @Query("UPDATE messages SET isDeleted = :isDeleted, deletedTimestamp = :deletedTimestamp WHERE id = :id")
     suspend fun markAsDeleted(id: Long, deletedTimestamp: Long, isDeleted: Boolean = true)
+
+    @Query("""
+        UPDATE messages SET 
+            isEdited = 1, 
+            editedAt = :editedAt, 
+            message = :newText,
+            originalMessage = CASE WHEN originalMessage IS NULL THEN :originalText ELSE originalMessage END
+        WHERE id = :id
+    """)
+    suspend fun markMessageEdited(id: Long, editedAt: Long, newText: String, originalText: String)
 
     @Query("SELECT * FROM messages WHERE id = :id")
     suspend fun getMessageById(id: Long): MessageEntity?

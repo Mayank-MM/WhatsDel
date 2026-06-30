@@ -9,8 +9,10 @@ import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import com.example.whatsdel.ui.screens.DashboardScreen
 import com.example.whatsdel.ui.screens.DeletedScreen
+import com.example.whatsdel.ui.screens.EditedMessagesScreen
 import com.example.whatsdel.ui.screens.MediaScreen
 import com.example.whatsdel.ui.screens.MediaViewerScreen
+import com.example.whatsdel.ui.screens.MessageDetailScreen
 import com.example.whatsdel.ui.screens.MessagesScreen
 import com.example.whatsdel.ui.screens.SettingsScreen
 
@@ -25,10 +27,18 @@ fun NavGraph(
         modifier = modifier
     ) {
         composable(Screen.Dashboard.route) {
-            DashboardScreen()
+            DashboardScreen(
+                onNavigateToEdited = {
+                    navController.navigate(Screen.EditedMessages.route)
+                }
+            )
         }
         composable(Screen.Messages.route) {
-            MessagesScreen()
+            MessagesScreen(
+                onMessageClick = { messageId ->
+                    navController.navigate(Screen.MessageDetail.createRoute(messageId))
+                }
+            )
         }
         composable(Screen.Deleted.route) {
             DeletedScreen()
@@ -61,6 +71,23 @@ fun NavGraph(
             )
         ) {
             MediaViewerScreen()
+        }
+        composable(Screen.EditedMessages.route) {
+            EditedMessagesScreen(
+                onMessageClick = { messageId ->
+                    navController.navigate(Screen.MessageDetail.createRoute(messageId))
+                }
+            )
+        }
+        composable(
+            route = Screen.MessageDetail.route,
+            arguments = listOf(
+                navArgument("messageId") {
+                    type = NavType.LongType
+                }
+            )
+        ) {
+            MessageDetailScreen()
         }
     }
 }

@@ -3,11 +3,15 @@ package com.example.whatsdel.ui.screens
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.DeleteSweep
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.Mic
@@ -29,6 +33,7 @@ import com.example.whatsdel.ui.components.LoadingIndicator
 import com.example.whatsdel.ui.components.StatCard
 import com.example.whatsdel.ui.theme.StatAudioColor
 import com.example.whatsdel.ui.theme.StatDeletedColor
+import com.example.whatsdel.ui.theme.StatEditedColor
 import com.example.whatsdel.ui.theme.StatImageColor
 import com.example.whatsdel.ui.theme.StatStickerColor
 import com.example.whatsdel.ui.theme.StatTotalColor
@@ -36,6 +41,7 @@ import com.example.whatsdel.ui.theme.StatVideoColor
 
 @Composable
 fun DashboardScreen(
+    onNavigateToEdited: () -> Unit,
     viewModel: DashboardViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -73,12 +79,26 @@ fun DashboardScreen(
                 )
             }
             item {
-                StatCard(
-                    title = stringResource(R.string.stat_deleted_messages),
-                    value = uiState.deletedMessages,
-                    icon = Icons.Outlined.Delete,
-                    accentColor = StatDeletedColor
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    StatCard(
+                        title = stringResource(R.string.stat_deleted_messages),
+                        value = uiState.deletedMessages,
+                        icon = Icons.Default.DeleteSweep,
+                        accentColor = StatDeletedColor,
+                        modifier = Modifier.weight(1f)
+                    )
+                    StatCard(
+                        title = stringResource(R.string.stat_edited_messages),
+                        value = uiState.editedMessages,
+                        icon = Icons.Default.Edit,
+                        accentColor = StatEditedColor,
+                        modifier = Modifier.weight(1f),
+                        onClick = onNavigateToEdited
+                    )
+                }
             }
             item {
                 StatCard(

@@ -25,5 +25,8 @@ data class MessageEntity(
     val mediaMimeType: String? = null,
     val mediaFileName: String? = null,
     val mediaSize: Long? = null,
-    val thumbnailPath: String? = null
+    val thumbnailPath: String? = null,
+    // Phase 4: Edit fields
+    val originalMessage: String? = null,
+    val editedAt: Long? = null
 )

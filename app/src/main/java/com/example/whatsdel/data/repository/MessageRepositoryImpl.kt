@@ -1,6 +1,8 @@
 package com.example.whatsdel.data.repository
 
+import com.example.whatsdel.data.dao.EditHistoryDao
 import com.example.whatsdel.data.dao.MessageDao
+import com.example.whatsdel.data.entity.MessageEditHistoryEntity
 import com.example.whatsdel.data.entity.MessageEntity
 import com.example.whatsdel.domain.repository.MessageRepository
 import kotlinx.coroutines.flow.Flow
@@ -9,7 +11,8 @@ import javax.inject.Singleton
 
 @Singleton
 class MessageRepositoryImpl @Inject constructor(
-    private val messageDao: MessageDao
+    private val messageDao: MessageDao,
+    private val editHistoryDao: EditHistoryDao
 ) : MessageRepository {
 
     override fun observeActiveMessages(): Flow<List<MessageEntity>> =
@@ -79,6 +82,9 @@ class MessageRepositoryImpl @Inject constructor(
     override fun searchDeletedMessages(query: String): Flow<List<MessageEntity>> =
         messageDao.searchDeletedMessages(query)
 
+    override fun searchEditedMessages(query: String): Flow<List<MessageEntity>> =
+        messageDao.searchEditedMessages(query)
+
     override suspend fun findMatchingMessage(chatName: String): MessageEntity? =
         messageDao.findMatchingMessage(chatName)
 
@@ -88,9 +94,28 @@ class MessageRepositoryImpl @Inject constructor(
     override suspend fun findMessageByNotificationId(notificationId: Int): MessageEntity? =
         messageDao.findMessageByNotificationId(notificationId)
 
+    override suspend fun findMessageBySenderAndNotificationId(sender: String, notificationId: Int): MessageEntity? =
+        messageDao.findMessageBySenderAndNotificationId(sender, notificationId)
+
     override suspend fun markAsDeleted(id: Long, deletedTimestamp: Long, isDeleted: Boolean) =
         messageDao.markAsDeleted(id, deletedTimestamp, isDeleted)
 
+    override suspend fun markMessageEdited(id: Long, editedAt: Long, newText: String, originalText: String) =
+        messageDao.markMessageEdited(id, editedAt, newText, originalText)
+
     override suspend fun getMessageById(id: Long): MessageEntity? =
         messageDao.getMessageById(id)
+
+    // Phase 4: Edit History
+    override suspend fun insertEditHistory(entry: MessageEditHistoryEntity): Long =
+        editHistoryDao.insertEditHistory(entry)
+
+    override fun observeEditHistory(messageId: Long): Flow<List<MessageEditHistoryEntity>> =
+        editHistoryDao.observeEditHistory(messageId)
+
+    override suspend fun getEditHistory(messageId: Long): List<MessageEditHistoryEntity> =
+        editHistoryDao.getEditHistory(messageId)
+
+    override suspend fun countDuplicateEdits(messageId: Long, newText: String): Int =
+        editHistoryDao.countDuplicateEdits(messageId, newText)
 }

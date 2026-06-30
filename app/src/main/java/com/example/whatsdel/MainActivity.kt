@@ -46,8 +46,10 @@ class MainActivity : ComponentActivity() {
                     currentRoute == Screen.Messages.route -> stringResource(R.string.nav_messages)
                     currentRoute == Screen.Deleted.route -> stringResource(R.string.nav_deleted)
                     currentRoute == Screen.Settings.route -> stringResource(R.string.nav_settings)
+                    currentRoute == Screen.EditedMessages.route -> stringResource(R.string.nav_edited)
                     currentRoute?.startsWith("media_viewer") == true -> stringResource(R.string.nav_media)
                     currentRoute?.startsWith("media") == true -> stringResource(R.string.nav_media)
+                    currentRoute?.startsWith("message_detail") == true -> stringResource(R.string.message_detail)
                     else -> stringResource(R.string.app_name)
                 }
 

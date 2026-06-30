@@ -11,4 +11,8 @@ sealed class Screen(val route: String) {
     data object MediaViewer : Screen("media_viewer/{messageId}") {
         fun createRoute(messageId: Long): String = "media_viewer/$messageId"
     }
+    data object EditedMessages : Screen("edited_messages")
+    data object MessageDetail : Screen("message_detail/{messageId}") {
+        fun createRoute(messageId: Long): String = "message_detail/$messageId"
+    }
 }

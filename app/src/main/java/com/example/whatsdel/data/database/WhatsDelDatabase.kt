@@ -8,13 +8,16 @@ import com.example.whatsdel.data.entity.MessageEntity
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
+import com.example.whatsdel.data.entity.MessageEditHistoryEntity
+
 @Database(
-    entities = [MessageEntity::class],
-    version = 4,
+    entities = [MessageEntity::class, MessageEditHistoryEntity::class],
+    version = 5,
     exportSchema = true
 )
 abstract class WhatsDelDatabase : RoomDatabase() {
     abstract fun messageDao(): MessageDao
+    abstract fun editHistoryDao(): com.example.whatsdel.data.dao.EditHistoryDao
 
     companion object {
         val MIGRATION_2_3 = object : Migration(2, 3) {
@@ -32,6 +35,15 @@ abstract class WhatsDelDatabase : RoomDatabase() {
                 db.execSQL("ALTER TABLE messages ADD COLUMN mediaFileName TEXT")
                 db.execSQL("ALTER TABLE messages ADD COLUMN mediaSize INTEGER")
                 db.execSQL("ALTER TABLE messages ADD COLUMN thumbnailPath TEXT")
+            }
+        }
+
+        val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE messages ADD COLUMN originalMessage TEXT")
+                db.execSQL("ALTER TABLE messages ADD COLUMN editedAt INTEGER")
+                db.execSQL("CREATE TABLE IF NOT EXISTS `message_edit_history` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `messageId` INTEGER NOT NULL, `previousText` TEXT NOT NULL, `newText` TEXT NOT NULL, `editedTimestamp` INTEGER NOT NULL, FOREIGN KEY(`messageId`) REFERENCES `messages`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_message_edit_history_messageId` ON `message_edit_history` (`messageId`)")
             }
         }
     }

@@ -2,6 +2,7 @@ package com.example.whatsdel.ui.components
 
 import androidx.compose.animation.core.animateIntAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -34,6 +35,7 @@ fun StatCard(
     value: Int,
     icon: ImageVector,
     accentColor: Color,
+    onClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     // Animate the count from 0 to the target value
@@ -47,8 +49,16 @@ fun StatCard(
         targetValue = value
     }
 
+    val clickModifier = if (onClick != null) {
+        Modifier.clickable { onClick() }
+    } else {
+        Modifier
+    }
+
     Card(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .then(clickModifier),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)

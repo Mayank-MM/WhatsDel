@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import android.util.Log
+import com.example.whatsdel.data.entity.MessageEditHistoryEntity
 import com.example.whatsdel.data.entity.MessageEntity
 import com.example.whatsdel.domain.repository.MessageRepository
 import com.example.whatsdel.utils.MediaStorageHelper
@@ -115,8 +116,8 @@ class WhatsDelNotificationListenerService : NotificationListenerService() {
 
         val postTime = sbn.postTime
 
-        // Basic deduplication
-        val hash = (sender + text).hashCode()
+        // Basic deduplication (include notificationId to allow edit detection)
+        val hash = (sender + text + notificationId).hashCode()
         val lastSeen = recentMessages[hash]
         if (lastSeen != null && (postTime - lastSeen) < 5000) {
             Log.d(TAG, "Duplicate message ignored: $sender - $text")
@@ -234,13 +235,54 @@ class WhatsDelNotificationListenerService : NotificationListenerService() {
             thumbnailPath = thumbnailPath
         )
 
-        Log.d(TAG, "Saving message: $sender in $chatName: $messageText (media: $hasMedia, type: $detectedMediaType)")
+        Log.d(TAG, "Processing message: $sender in $chatName: $messageText (media: $hasMedia, type: $detectedMediaType)")
 
         serviceScope.launch {
             try {
+                // EDIT DETECTION LOGIC
+                // We check if a message already exists with this sender and notificationId
+                val existingMessage = messageRepository.findMessageBySenderAndNotificationId(sender, notificationId)
+                
+                if (existingMessage != null) {
+                    if (existingMessage.message != messageText) {
+                        // The text has changed -> It's an edit!
+                        val originalText = existingMessage.originalMessage ?: existingMessage.message
+                        
+                        Log.d(TAG, "Edit detected for $sender: '${existingMessage.message}' -> '$messageText'")
+                        
+                        // 1. Mark the message as edited in the main table
+                        messageRepository.markMessageEdited(
+                            id = existingMessage.id,
+                            editedAt = postTime,
+                            newText = messageText,
+                            originalText = originalText
+                        )
+                        
+                        // 2. Prevent duplicate edit histories
+                        val duplicateCount = messageRepository.countDuplicateEdits(existingMessage.id, messageText)
+                        if (duplicateCount == 0) {
+                            // 3. Insert into edit history
+                            val editHistory = MessageEditHistoryEntity(
+                                messageId = existingMessage.id,
+                                previousText = existingMessage.message,
+                                newText = messageText,
+                                editedTimestamp = postTime
+                            )
+                            messageRepository.insertEditHistory(editHistory)
+                            Log.d(TAG, "Edit history saved.")
+                        }
+                    } else {
+                        Log.d(TAG, "Duplicate notification update ignored for $sender (text identical)")
+                    }
+                    // Do not insert a new message entity if an existing one was found
+                    return@launch
+                }
+                
+                // If no existing message was found, insert it as a new message
                 messageRepository.insertMessage(messageEntity)
+                Log.d(TAG, "New message saved.")
             } catch (e: Exception) {
-                Log.e(TAG, "Failed to save message", e)
+                Log.e(TAG, "Failed to save or process edited message", e)
             }
         }
     }

@@ -10,8 +10,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Message
-import androidx.compose.material.icons.outlined.Notifications
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -22,40 +21,24 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.whatsdel.R
+import com.example.whatsdel.ui.components.EditedMessageItem
 import com.example.whatsdel.ui.components.EmptyState
 import com.example.whatsdel.ui.components.LoadingIndicator
-import com.example.whatsdel.ui.components.MessageItem
-import com.example.whatsdel.ui.components.PermissionStatusCard
-import com.example.whatsdel.utils.PermissionUtils
 
 @Composable
-fun MessagesScreen(
+fun EditedMessagesScreen(
     onMessageClick: (Long) -> Unit,
-    viewModel: MessagesViewModel = hiltViewModel()
+    viewModel: EditedMessagesViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
-    val context = LocalContext.current
-    val isNotificationEnabled = PermissionUtils.isNotificationListenerEnabled(context)
 
     Column(modifier = Modifier.fillMaxSize()) {
-        if (!isNotificationEnabled) {
-            PermissionStatusCard(
-                title = stringResource(R.string.settings_notification_access),
-                isGranted = false,
-                icon = Icons.Outlined.Notifications,
-                onActionClick = {
-                    context.startActivity(PermissionUtils.notificationListenerSettingsIntent())
-                }
-            )
-        }
-
         // Search bar
         OutlinedTextField(
             value = searchQuery,
@@ -63,7 +46,7 @@ fun MessagesScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 8.dp),
-            placeholder = { Text("Search messages...") },
+            placeholder = { Text("Search edited messages...") },
             leadingIcon = {
                 Icon(
                     imageVector = Icons.Outlined.Search,
@@ -90,9 +73,9 @@ fun MessagesScreen(
                 }
                 uiState.messages.isEmpty() -> {
                     EmptyState(
-                        icon = Icons.Outlined.Message,
-                        message = stringResource(R.string.messages_empty),
-                        subtitle = stringResource(R.string.messages_empty_subtitle)
+                        icon = Icons.Default.Edit,
+                        message = stringResource(R.string.edited_empty),
+                        subtitle = stringResource(R.string.edited_empty_subtitle)
                     )
                 }
                 else -> {
@@ -104,7 +87,7 @@ fun MessagesScreen(
                             items = uiState.messages,
                             key = { it.id }
                         ) { message ->
-                            MessageItem(
+                            EditedMessageItem(
                                 message = message,
                                 onClick = { onMessageClick(message.id) }
                             )

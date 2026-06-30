@@ -25,7 +25,11 @@ object DatabaseModule {
             WhatsDelDatabase::class.java,
             "whatsdel_database"
         )
-            .addMigrations(WhatsDelDatabase.MIGRATION_2_3, WhatsDelDatabase.MIGRATION_3_4)
+            .addMigrations(
+                WhatsDelDatabase.MIGRATION_2_3, 
+                WhatsDelDatabase.MIGRATION_3_4,
+                WhatsDelDatabase.MIGRATION_4_5
+            )
             .build()
     }
 
@@ -33,5 +37,11 @@ object DatabaseModule {
     @Singleton
     fun provideMessageDao(database: WhatsDelDatabase): MessageDao {
         return database.messageDao()
+    }
+
+    @Provides
+    @Singleton
+    fun provideEditHistoryDao(database: WhatsDelDatabase): com.example.whatsdel.data.dao.EditHistoryDao {
+        return database.editHistoryDao()
     }
 }

@@ -1,5 +1,6 @@
 package com.example.whatsdel.domain.repository
 
+import com.example.whatsdel.data.entity.MessageEditHistoryEntity
 import com.example.whatsdel.data.entity.MessageEntity
 import kotlinx.coroutines.flow.Flow
 
@@ -50,13 +51,28 @@ interface MessageRepository {
 
     fun searchDeletedMessages(query: String): Flow<List<MessageEntity>>
 
+    fun searchEditedMessages(query: String): Flow<List<MessageEntity>>
+
     suspend fun findMatchingMessage(chatName: String): MessageEntity?
 
     suspend fun getRecentActiveMessages(): List<MessageEntity>
 
     suspend fun findMessageByNotificationId(notificationId: Int): MessageEntity?
 
+    suspend fun findMessageBySenderAndNotificationId(sender: String, notificationId: Int): MessageEntity?
+
     suspend fun markAsDeleted(id: Long, deletedTimestamp: Long, isDeleted: Boolean = true)
 
+    suspend fun markMessageEdited(id: Long, editedAt: Long, newText: String, originalText: String)
+
     suspend fun getMessageById(id: Long): MessageEntity?
+
+    // Phase 4: Edit History
+    suspend fun insertEditHistory(entry: MessageEditHistoryEntity): Long
+
+    fun observeEditHistory(messageId: Long): Flow<List<MessageEditHistoryEntity>>
+
+    suspend fun getEditHistory(messageId: Long): List<MessageEditHistoryEntity>
+
+    suspend fun countDuplicateEdits(messageId: Long, newText: String): Int
 }

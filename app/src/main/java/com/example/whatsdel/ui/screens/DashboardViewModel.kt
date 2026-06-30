@@ -13,11 +13,13 @@ import javax.inject.Inject
 data class DashboardUiState(
     val totalMessages: Int = 0,
     val deletedMessages: Int = 0,
+    val editedMessages: Int = 0,
+    val totalMedia: Int = 0,
     val imageCount: Int = 0,
     val videoCount: Int = 0,
     val audioCount: Int = 0,
     val stickerCount: Int = 0,
-    val isLoading: Boolean = false
+    val isLoading: Boolean = true
 )
 
 @HiltViewModel
@@ -28,6 +30,8 @@ class DashboardViewModel @Inject constructor(
     val uiState: StateFlow<DashboardUiState> = combine(
         messageRepository.getMessageCount(),
         messageRepository.getDeletedCount(),
+        messageRepository.getEditedCount(),
+        messageRepository.getMediaCount(),
         messageRepository.getImageCount(),
         messageRepository.getVideoCount(),
         messageRepository.getAudioCount(),
@@ -36,10 +40,13 @@ class DashboardViewModel @Inject constructor(
         DashboardUiState(
             totalMessages = counts[0],
             deletedMessages = counts[1],
-            imageCount = counts[2],
-            videoCount = counts[3],
-            audioCount = counts[4],
-            stickerCount = counts[5]
+            editedMessages = counts[2],
+            totalMedia = counts[3],
+            imageCount = counts[4],
+            videoCount = counts[5],
+            audioCount = counts[6],
+            stickerCount = counts[7],
+            isLoading = false
         )
     }.stateIn(
         scope = viewModelScope,
