@@ -64,75 +64,36 @@ class WhatsDelNotificationListenerService : NotificationListenerService() {
         val notification = sbn.notification ?: return
         val extras = notification.extras ?: return
 
-        // Extract information safely without early returns
+        // Extract basic information
         val title = extras.getString(Notification.EXTRA_TITLE)?.trim() ?: ""
-        val text = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString()?.trim() ?: ""
-
-        // Also extract from EXTRA_TEXT_LINES as WhatsApp sometimes buries it there
-        val textLines = extras.getCharSequenceArray(Notification.EXTRA_TEXT_LINES)
-        val textLinesString = textLines?.joinToString("\n") ?: ""
-        
-        val fullText = "$text\n$textLinesString".lowercase()
-        val titleLower = title.lowercase()
-
-        // WhatsApp groups usually have the group name in EXTRA_CONVERSATION_TITLE or combined in title
-        val conversationTitle = extras.getString(Notification.EXTRA_CONVERSATION_TITLE)?.trim()
         val isGroup = extras.getBoolean(Notification.EXTRA_IS_GROUP_CONVERSATION, false)
+        val conversationTitle = extras.getString(Notification.EXTRA_CONVERSATION_TITLE)?.trim()
         val isSummary = (notification.flags and Notification.FLAG_GROUP_SUMMARY) != 0
 
-        // Parse sender and chat name accurately
-        val sender: String
+        // Parse default sender and chat name
+        val defaultSender: String
         val chatName: String
 
         if (isGroup) {
             chatName = conversationTitle ?: title.substringBefore(":").trim()
-            sender = if (conversationTitle != null) {
+            defaultSender = if (conversationTitle != null) {
                 title
             } else {
                 title.substringAfter(":").trim()
             }
         } else {
-            sender = title
+            defaultSender = title
             chatName = title
         }
 
         val notificationId = sbn.id
 
-        // Check if the text OR title indicates a deleted message
-        val isDeletedText = deletionIndicators.any { fullText.contains(it) || titleLower.contains(it) }
-        val isDeletedFuzzy = (fullText.contains("deleted") && fullText.contains("message")) || 
-                             (fullText.contains("डिलीट") && fullText.contains("मैसेज"))
-
-        if (isDeletedText || isDeletedFuzzy) {
-            Log.d(TAG, "Deletion detected for chat: $chatName")
-            handleDeletion(chatName, fullText, notificationId)
+        // Ignore summary notifications for regular messages processing to avoid duplicates
+        if (isSummary) {
             return
         }
 
-        // Ignore summary notifications for regular messages
-        if (isSummary || text.isBlank()) {
-            return
-        }
-
-        val postTime = sbn.postTime
-
-        // Basic deduplication (include notificationId to allow edit detection)
-        val hash = (sender + text + notificationId).hashCode()
-        val lastSeen = recentMessages[hash]
-        if (lastSeen != null && (postTime - lastSeen) < 5000) {
-            Log.d(TAG, "Duplicate message ignored: $sender - $text")
-            return
-        }
-
-        // Update cache and clean old entries
-        recentMessages[hash] = postTime
-        cleanOldCache(postTime)
-
-        // Detect media type from notification content
-        val detectedMediaType = detectMediaType(text, fullText)
-        val hasMedia = detectedMediaType != null
-
-        // Extract thumbnail bitmap safely (handling both Bitmap and Icon types)
+        // Extract thumbnail bitmap safely from extras as a fallback
         fun extractBitmapFromExtras(key: String): Bitmap? {
             return try {
                 val obj = extras.get(key)
@@ -162,127 +123,186 @@ class WhatsDelNotificationListenerService : NotificationListenerService() {
             }
         }
 
-        var mediaBitmap = extractBitmapFromExtras(Notification.EXTRA_PICTURE)
+        val fallbackBitmap = extractBitmapFromExtras(Notification.EXTRA_PICTURE)
 
-        // WhatsApp often uses MessagingStyle for images. Try to extract from dataUri if available
-        if (mediaBitmap == null) {
-            val messagingStyle = androidx.core.app.NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(notification)
-            if (messagingStyle != null) {
-                for (msg in messagingStyle.messages) {
-                    val uri = msg.dataUri
-                    if (uri != null) {
-                        try {
-                            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
-                                val source = android.graphics.ImageDecoder.createSource(contentResolver, uri)
-                                mediaBitmap = android.graphics.ImageDecoder.decodeBitmap(source)
-                            } else {
-                                @Suppress("DEPRECATION")
-                                mediaBitmap = android.provider.MediaStore.Images.Media.getBitmap(contentResolver, uri)
-                            }
-                            if (mediaBitmap != null) break
-                        } catch (e: Exception) {
-                            Log.e(TAG, "Error loading image from MessagingStyle URI", e)
-                        }
-                    }
-                }
-            }
-        }
+        val messagingStyle = androidx.core.app.NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(notification)
 
-        var thumbnailPath: String? = null
+        if (messagingStyle != null && messagingStyle.messages.isNotEmpty()) {
+            // Process each message in the conversation history provided by MessagingStyle
+            for (msg in messagingStyle.messages) {
+                val msgSender = msg.person?.name?.toString() ?: defaultSender
+                val msgText = msg.text?.toString()?.trim() ?: ""
+                val msgTimestamp = msg.timestamp
+                val msgDataUri = msg.dataUri
 
-        if (hasMedia && mediaBitmap != null) {
-            val fileName = MediaStorageHelper.generateFileName(sender, postTime, detectedMediaType!!)
-            thumbnailPath = MediaStorageHelper.saveThumbnail(applicationContext, mediaBitmap, fileName)
-            Log.d(TAG, "Media thumbnail saved: $thumbnailPath")
-        }
-
-        // Determine the caption (for media messages, the text is often a caption)
-        val messageText = if (hasMedia) {
-            // If text is just the media indicator, set message to the media type label
-            val textLower = text.lowercase()
-            val isOnlyIndicator = mediaPatterns.values.flatten().any { textLower == it }
-            if (isOnlyIndicator) {
-                "${detectedMediaType?.replaceFirstChar { it.uppercase() }} received"
-            } else {
-                text // It's a caption
+                processSingleMessage(
+                    chatName = chatName,
+                    sender = msgSender,
+                    rawText = msgText,
+                    timestamp = msgTimestamp,
+                    notificationId = notificationId,
+                    packageName = packageName,
+                    dataUri = msgDataUri,
+                    fallbackBitmap = fallbackBitmap
+                )
             }
         } else {
-            text
+            // Fallback for notifications that do not use MessagingStyle
+            val text = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString()?.trim() ?: ""
+            val textLines = extras.getCharSequenceArray(Notification.EXTRA_TEXT_LINES)
+            val textLinesString = textLines?.joinToString("\n") ?: ""
+            val fullText = if (textLinesString.isNotBlank()) "$text\n$textLinesString" else text
+            
+            processSingleMessage(
+                chatName = chatName,
+                sender = defaultSender,
+                rawText = fullText,
+                timestamp = sbn.postTime,
+                notificationId = notificationId,
+                packageName = packageName,
+                dataUri = null,
+                fallbackBitmap = fallbackBitmap
+            )
+        }
+    }
+
+    private fun processSingleMessage(
+        chatName: String,
+        sender: String,
+        rawText: String,
+        timestamp: Long,
+        notificationId: Int,
+        packageName: String,
+        dataUri: android.net.Uri?,
+        fallbackBitmap: Bitmap?
+    ) {
+        val fullTextLower = rawText.lowercase()
+        
+        // 1. Check for deletion
+        val isDeletedText = deletionIndicators.any { fullTextLower.contains(it) }
+        val isDeletedFuzzy = (fullTextLower.contains("deleted") && fullTextLower.contains("message")) || 
+                             (fullTextLower.contains("डिलीट") && fullTextLower.contains("मैसेज"))
+
+        if (isDeletedText || isDeletedFuzzy) {
+            handleDeletion(chatName, sender, rawText, notificationId, timestamp)
+            return
         }
 
-        val messageEntity = MessageEntity(
-            sender = sender,
-            chatName = chatName,
-            message = messageText,
-            timestamp = postTime,
-            packageName = packageName,
-            notificationId = notificationId,
-            messageType = if (hasMedia) "media" else "text",
-            isDeleted = false,
-            isEdited = false,
-            hasMedia = hasMedia,
-            mediaType = detectedMediaType,
-            mediaUri = null,
-            mediaMimeType = when (detectedMediaType) {
-                "image" -> "image/jpeg"
-                "video" -> "video/mp4"
-                "voice_note" -> "audio/ogg"
-                "sticker" -> "image/webp"
-                else -> null
-            },
-            mediaFileName = if (hasMedia) MediaStorageHelper.generateFileName(sender, postTime, detectedMediaType!!) else null,
-            mediaSize = null,
-            thumbnailPath = thumbnailPath
-        )
-
-        Log.d(TAG, "Processing message: $sender in $chatName: $messageText (media: $hasMedia, type: $detectedMediaType)")
+        if (rawText.isBlank() && dataUri == null && fallbackBitmap == null) return
 
         serviceScope.launch {
             try {
-                // EDIT DETECTION LOGIC
-                // We check if a message already exists with this sender and notificationId
-                val existingMessage = messageRepository.findMessageBySenderAndNotificationId(sender, notificationId)
+                // Determine media type
+                val detectedMediaType = detectMediaType(rawText, rawText)
+                val hasMedia = detectedMediaType != null || dataUri != null || fallbackBitmap != null
+                
+                var finalMediaType = detectedMediaType
+                if (finalMediaType == null && dataUri != null) {
+                    finalMediaType = "image"
+                } else if (finalMediaType == null && fallbackBitmap != null) {
+                    finalMediaType = "image"
+                }
+
+                // 2. Exact lookup by (chatName, sender, timestamp)
+                val existingMessage = messageRepository.findMessageByExactTimestamp(chatName, sender, timestamp)
                 
                 if (existingMessage != null) {
-                    if (existingMessage.message != messageText) {
-                        // The text has changed -> It's an edit!
+                    // Check if it's an edit (text changed)
+                    if (existingMessage.message != rawText && rawText.isNotBlank()) {
                         val originalText = existingMessage.originalMessage ?: existingMessage.message
+                        Log.d(TAG, "Edit detected for $sender at $timestamp: '${existingMessage.message}' -> '$rawText'")
                         
-                        Log.d(TAG, "Edit detected for $sender: '${existingMessage.message}' -> '$messageText'")
-                        
-                        // 1. Mark the message as edited in the main table
                         messageRepository.markMessageEdited(
                             id = existingMessage.id,
-                            editedAt = postTime,
-                            newText = messageText,
+                            editedAt = System.currentTimeMillis(),
+                            newText = rawText,
                             originalText = originalText
                         )
                         
-                        // 2. Prevent duplicate edit histories
-                        val duplicateCount = messageRepository.countDuplicateEdits(existingMessage.id, messageText)
+                        val duplicateCount = messageRepository.countDuplicateEdits(existingMessage.id, rawText)
                         if (duplicateCount == 0) {
-                            // 3. Insert into edit history
                             val editHistory = MessageEditHistoryEntity(
                                 messageId = existingMessage.id,
                                 previousText = existingMessage.message,
-                                newText = messageText,
-                                editedTimestamp = postTime
+                                newText = rawText,
+                                editedTimestamp = System.currentTimeMillis()
                             )
                             messageRepository.insertEditHistory(editHistory)
-                            Log.d(TAG, "Edit history saved.")
                         }
+                    } else if (existingMessage.hasMedia && existingMessage.updatedAt == null) {
+                        // Mark media as updated (download likely finished)
+                        messageRepository.updateMessage(existingMessage.copy(updatedAt = System.currentTimeMillis()))
                     } else {
-                        Log.d(TAG, "Duplicate notification update ignored for $sender (text identical)")
+                        Log.d(TAG, "Duplicate message ignored (exact match): $sender at $timestamp")
                     }
-                    // Do not insert a new message entity if an existing one was found
                     return@launch
                 }
                 
-                // If no existing message was found, insert it as a new message
+                // 3. New Message - Extract Media if present
+                var mediaBitmap = fallbackBitmap
+                if (mediaBitmap == null && dataUri != null) {
+                    try {
+                        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+                            val source = android.graphics.ImageDecoder.createSource(contentResolver, dataUri)
+                            mediaBitmap = android.graphics.ImageDecoder.decodeBitmap(source)
+                        } else {
+                            @Suppress("DEPRECATION")
+                            mediaBitmap = android.provider.MediaStore.Images.Media.getBitmap(contentResolver, dataUri)
+                        }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error loading image from dataUri", e)
+                    }
+                }
+                
+                var thumbnailPath: String? = null
+                if (hasMedia && mediaBitmap != null && finalMediaType != null) {
+                    val fileName = MediaStorageHelper.generateFileName(sender, timestamp, finalMediaType)
+                    thumbnailPath = MediaStorageHelper.saveThumbnail(applicationContext, mediaBitmap, fileName)
+                }
+
+                val messageText = if (hasMedia) {
+                    val textLower = rawText.lowercase()
+                    val isOnlyIndicator = mediaPatterns.values.flatten().any { textLower == it }
+                    if (isOnlyIndicator && finalMediaType != null) {
+                        "${finalMediaType.replaceFirstChar { it.uppercase() }} received"
+                    } else {
+                        rawText 
+                    }
+                } else {
+                    rawText
+                }
+
+                val messageEntity = MessageEntity(
+                    sender = sender,
+                    chatName = chatName,
+                    message = messageText,
+                    timestamp = timestamp,
+                    packageName = packageName,
+                    notificationId = notificationId,
+                    messageType = if (hasMedia) "media" else "text",
+                    isDeleted = false,
+                    isEdited = false,
+                    hasMedia = hasMedia,
+                    mediaType = finalMediaType,
+                    mediaUri = null,
+                    mediaMimeType = when (finalMediaType) {
+                        "image" -> "image/jpeg"
+                        "video" -> "video/mp4"
+                        "voice_note" -> "audio/ogg"
+                        "sticker" -> "image/webp"
+                        else -> null
+                    },
+                    mediaFileName = if (hasMedia && finalMediaType != null) MediaStorageHelper.generateFileName(sender, timestamp, finalMediaType) else null,
+                    mediaSize = null,
+                    thumbnailPath = thumbnailPath,
+                    updatedAt = if (hasMedia && mediaBitmap != null) System.currentTimeMillis() else null
+                )
+
                 messageRepository.insertMessage(messageEntity)
-                Log.d(TAG, "New message saved.")
+                Log.d(TAG, "New message saved: $sender at $timestamp")
+                
             } catch (e: Exception) {
-                Log.e(TAG, "Failed to save or process edited message", e)
+                Log.e(TAG, "Failed to process message", e)
             }
         }
     }
@@ -309,34 +329,27 @@ class WhatsDelNotificationListenerService : NotificationListenerService() {
         return null
     }
 
-    private fun handleDeletion(chatName: String, fullText: String, notificationId: Int) {
+    private fun handleDeletion(chatName: String, sender: String, fullText: String, notificationId: Int, timestamp: Long) {
         serviceScope.launch {
             try {
-                // METHOD 1: Try exact match via Notification ID (Bulletproof for updates)
-                var matchingMessage = messageRepository.findMessageByNotificationId(notificationId)
+                // METHOD 1: Try exact match via Timestamp (Bulletproof for MessagingStyle)
+                var matchingMessage = messageRepository.findMessageByExactTimestamp(chatName, sender, timestamp)
 
-                // METHOD 2: Try exact/LIKE match by chatName
-                if (matchingMessage == null) {
-                    matchingMessage = messageRepository.findMatchingMessage(chatName)
-                }
-
-                // METHOD 3: Fuzzy fallback scanning recent messages
+                // METHOD 2: Fuzzy fallback scanning recent messages
                 if (matchingMessage == null) {
                     val recentMessagesList = messageRepository.getRecentActiveMessages()
                     matchingMessage = recentMessagesList.firstOrNull { 
-                        fullText.contains(it.sender.lowercase()) || fullText.contains(it.chatName.lowercase())
+                        it.chatName == chatName && (fullText.contains(it.sender.lowercase()) || fullText.contains(it.chatName.lowercase()))
                     }
                 }
 
-                if (matchingMessage != null) {
+                if (matchingMessage != null && !matchingMessage.isDeleted) {
                     messageRepository.markAsDeleted(
                         id = matchingMessage.id,
                         deletedTimestamp = System.currentTimeMillis(),
                         isDeleted = true
                     )
                     Log.d(TAG, "Message marked as deleted: ${matchingMessage.message}")
-                } else {
-                    Log.d(TAG, "No matching message found for deletion in chat: $chatName")
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to handle deletion", e)

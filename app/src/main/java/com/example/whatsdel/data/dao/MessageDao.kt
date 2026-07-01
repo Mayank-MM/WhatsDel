@@ -18,7 +18,7 @@ interface MessageDao {
     @Query("SELECT * FROM messages WHERE isDeleted = 1 ORDER BY deletedTimestamp DESC")
     fun observeDeletedMessages(): Flow<List<MessageEntity>>
 
-    @Query("SELECT * FROM messages WHERE isEdited = 1 ORDER BY timestamp DESC")
+    @Query("SELECT * FROM messages WHERE isEdited = 1 ORDER BY editedAt DESC")
     fun getEditedMessages(): Flow<List<MessageEntity>>
 
     @Query("SELECT * FROM messages WHERE mediaPath IS NOT NULL ORDER BY timestamp DESC")
@@ -128,6 +128,9 @@ interface MessageDao {
 
     @Query("SELECT * FROM messages WHERE sender = :sender AND notificationId = :notificationId AND isDeleted = 0 ORDER BY timestamp DESC LIMIT 1")
     suspend fun findMessageBySenderAndNotificationId(sender: String, notificationId: Int): MessageEntity?
+
+    @Query("SELECT * FROM messages WHERE chatName = :chatName AND sender = :sender AND timestamp = :timestamp AND isDeleted = 0 LIMIT 1")
+    suspend fun findMessageByExactTimestamp(chatName: String, sender: String, timestamp: Long): MessageEntity?
 
     @Query("UPDATE messages SET isDeleted = :isDeleted, deletedTimestamp = :deletedTimestamp WHERE id = :id")
     suspend fun markAsDeleted(id: Long, deletedTimestamp: Long, isDeleted: Boolean = true)

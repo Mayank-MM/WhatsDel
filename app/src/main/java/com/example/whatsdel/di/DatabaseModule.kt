@@ -28,7 +28,8 @@ object DatabaseModule {
             .addMigrations(
                 WhatsDelDatabase.MIGRATION_2_3, 
                 WhatsDelDatabase.MIGRATION_3_4,
-                WhatsDelDatabase.MIGRATION_4_5
+                WhatsDelDatabase.MIGRATION_4_5,
+                WhatsDelDatabase.MIGRATION_5_6
             )
             .build()
     }

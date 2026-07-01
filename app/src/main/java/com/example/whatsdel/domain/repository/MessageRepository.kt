@@ -61,6 +61,8 @@ interface MessageRepository {
 
     suspend fun findMessageBySenderAndNotificationId(sender: String, notificationId: Int): MessageEntity?
 
+    suspend fun findMessageByExactTimestamp(chatName: String, sender: String, timestamp: Long): MessageEntity?
+
     suspend fun markAsDeleted(id: Long, deletedTimestamp: Long, isDeleted: Boolean = true)
 
     suspend fun markMessageEdited(id: Long, editedAt: Long, newText: String, originalText: String)

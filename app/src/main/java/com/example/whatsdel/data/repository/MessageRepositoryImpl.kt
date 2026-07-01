@@ -97,6 +97,9 @@ class MessageRepositoryImpl @Inject constructor(
     override suspend fun findMessageBySenderAndNotificationId(sender: String, notificationId: Int): MessageEntity? =
         messageDao.findMessageBySenderAndNotificationId(sender, notificationId)
 
+    override suspend fun findMessageByExactTimestamp(chatName: String, sender: String, timestamp: Long): MessageEntity? =
+        messageDao.findMessageByExactTimestamp(chatName, sender, timestamp)
+
     override suspend fun markAsDeleted(id: Long, deletedTimestamp: Long, isDeleted: Boolean) =
         messageDao.markAsDeleted(id, deletedTimestamp, isDeleted)
 

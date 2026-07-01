@@ -12,7 +12,7 @@ import com.example.whatsdel.data.entity.MessageEditHistoryEntity
 
 @Database(
     entities = [MessageEntity::class, MessageEditHistoryEntity::class],
-    version = 5,
+    version = 6,
     exportSchema = true
 )
 abstract class WhatsDelDatabase : RoomDatabase() {
@@ -44,6 +44,12 @@ abstract class WhatsDelDatabase : RoomDatabase() {
                 db.execSQL("ALTER TABLE messages ADD COLUMN editedAt INTEGER")
                 db.execSQL("CREATE TABLE IF NOT EXISTS `message_edit_history` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `messageId` INTEGER NOT NULL, `previousText` TEXT NOT NULL, `newText` TEXT NOT NULL, `editedTimestamp` INTEGER NOT NULL, FOREIGN KEY(`messageId`) REFERENCES `messages`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )")
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_message_edit_history_messageId` ON `message_edit_history` (`messageId`)")
+            }
+        }
+
+        val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE messages ADD COLUMN updatedAt INTEGER")
             }
         }
     }

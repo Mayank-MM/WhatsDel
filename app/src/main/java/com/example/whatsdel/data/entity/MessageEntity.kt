@@ -28,5 +28,6 @@ data class MessageEntity(
     val thumbnailPath: String? = null,
     // Phase 4: Edit fields
     val originalMessage: String? = null,
-    val editedAt: Long? = null
+    val editedAt: Long? = null,
+    val updatedAt: Long? = null // Added in v6 for media download timestamps
 )
