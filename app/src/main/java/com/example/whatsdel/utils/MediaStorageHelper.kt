@@ -59,6 +59,25 @@ object MediaStorageHelper {
     }
 
     /**
+     * Securely copies a content URI to app-private storage.
+     * Returns a Pair of (absolutePath, fileSize) on success, or throws an Exception on failure.
+     */
+    fun copyUriToAppStorage(context: Context, uri: android.net.Uri, fileName: String): Pair<String, Long> {
+        val dir = File(context.getExternalFilesDir(android.os.Environment.DIRECTORY_PICTURES), "WhatsDelMedia")
+        if (!dir.exists()) dir.mkdirs()
+
+        val destFile = File(dir, fileName)
+        
+        context.contentResolver.openInputStream(uri)?.use { inputStream ->
+            FileOutputStream(destFile).use { outputStream ->
+                inputStream.copyTo(outputStream)
+            }
+        } ?: throw java.io.FileNotFoundException("Could not open InputStream for URI: $uri")
+
+        return Pair(destFile.absolutePath, destFile.length())
+    }
+
+    /**
      * Returns the total size of the thumbnails directory in bytes.
      */
     fun getThumbnailsDirSize(context: Context): Long {

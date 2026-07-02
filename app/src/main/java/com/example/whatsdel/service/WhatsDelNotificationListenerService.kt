@@ -9,6 +9,7 @@ import com.example.whatsdel.data.entity.MessageEditHistoryEntity
 import com.example.whatsdel.data.entity.MessageEntity
 import com.example.whatsdel.domain.repository.MessageRepository
 import com.example.whatsdel.utils.MediaStorageHelper
+import com.example.whatsdel.utils.NotificationLogger
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -60,6 +61,11 @@ class WhatsDelNotificationListenerService : NotificationListenerService() {
         if (packageName != "com.whatsapp" && packageName != "com.whatsapp.w4b") {
             return
         }
+
+        // Notification Logging
+        val sharedPrefs = applicationContext.getSharedPreferences("whatsdel_prefs", android.content.Context.MODE_PRIVATE)
+        val isLoggingEnabled = sharedPrefs.getBoolean("raw_logging_enabled", false)
+        NotificationLogger.dumpNotification(sbn, isLoggingEnabled)
 
         val notification = sbn.notification ?: return
         val extras = notification.extras ?: return
@@ -240,24 +246,47 @@ class WhatsDelNotificationListenerService : NotificationListenerService() {
                 
                 // 3. New Message - Extract Media if present
                 var mediaBitmap = fallbackBitmap
-                if (mediaBitmap == null && dataUri != null) {
-                    try {
-                        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
-                            val source = android.graphics.ImageDecoder.createSource(contentResolver, dataUri)
-                            mediaBitmap = android.graphics.ImageDecoder.decodeBitmap(source)
-                        } else {
-                            @Suppress("DEPRECATION")
-                            mediaBitmap = android.provider.MediaStore.Images.Media.getBitmap(contentResolver, dataUri)
+                var localMediaPath: String? = null
+                var mediaSize: Long? = null
+                var captureSuccess: Boolean? = null
+                var failureReason: String? = null
+                
+                if (dataUri != null) {
+                    val fileName = MediaStorageHelper.generateFileName(sender, timestamp, finalMediaType ?: "file")
+                    val result = extractAndSaveMedia(dataUri, fileName)
+                    if (result.first != null) {
+                        localMediaPath = result.first
+                        mediaSize = result.second
+                        captureSuccess = true
+                        
+                        // Try to load bitmap for thumbnail if it's an image or video
+                        if (finalMediaType == "image" || finalMediaType == "video") {
+                            try {
+                                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+                                    val source = android.graphics.ImageDecoder.createSource(contentResolver, dataUri)
+                                    mediaBitmap = android.graphics.ImageDecoder.decodeBitmap(source)
+                                } else {
+                                    @Suppress("DEPRECATION")
+                                    mediaBitmap = android.provider.MediaStore.Images.Media.getBitmap(contentResolver, dataUri)
+                                }
+                            } catch (e: Exception) {
+                                Log.e(TAG, "Error loading thumbnail bitmap from dataUri", e)
+                            }
                         }
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Error loading image from dataUri", e)
+                    } else {
+                        captureSuccess = false
+                        failureReason = result.third
                     }
+                } else if (fallbackBitmap != null) {
+                    mediaBitmap = fallbackBitmap
+                    captureSuccess = true
+                    // Note: fallbackBitmap is just a thumbnail, not the full media file, so localMediaPath remains null
                 }
                 
                 var thumbnailPath: String? = null
                 if (hasMedia && mediaBitmap != null && finalMediaType != null) {
-                    val fileName = MediaStorageHelper.generateFileName(sender, timestamp, finalMediaType)
-                    thumbnailPath = MediaStorageHelper.saveThumbnail(applicationContext, mediaBitmap, fileName)
+                    val thumbName = MediaStorageHelper.generateFileName(sender, timestamp, "thumb_$finalMediaType")
+                    thumbnailPath = MediaStorageHelper.saveThumbnail(applicationContext, mediaBitmap, thumbName)
                 }
 
                 val messageText = if (hasMedia) {
@@ -293,9 +322,12 @@ class WhatsDelNotificationListenerService : NotificationListenerService() {
                         else -> null
                     },
                     mediaFileName = if (hasMedia && finalMediaType != null) MediaStorageHelper.generateFileName(sender, timestamp, finalMediaType) else null,
-                    mediaSize = null,
+                    mediaSize = mediaSize,
                     thumbnailPath = thumbnailPath,
-                    updatedAt = if (hasMedia && mediaBitmap != null) System.currentTimeMillis() else null
+                    updatedAt = if (hasMedia && (captureSuccess == true)) System.currentTimeMillis() else null,
+                    localMediaPath = localMediaPath,
+                    mediaCaptureSuccess = captureSuccess,
+                    mediaCaptureFailureReason = failureReason
                 )
 
                 messageRepository.insertMessage(messageEntity)
@@ -303,6 +335,35 @@ class WhatsDelNotificationListenerService : NotificationListenerService() {
                 
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to process message", e)
+            }
+        }
+    }
+
+    private suspend fun extractAndSaveMedia(
+        uri: android.net.Uri,
+        fileName: String,
+        retryCount: Int = 0
+    ): Triple<String?, Long?, String?> { // Triple<localPath, size, failureReason>
+        return try {
+            try {
+                contentResolver.takePersistableUriPermission(uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            } catch (e: SecurityException) {
+                Log.w(TAG, "Could not take persistable URI permission for $uri", e)
+            }
+
+            val result = MediaStorageHelper.copyUriToAppStorage(applicationContext, uri, fileName)
+            Triple(result.first, result.second, null)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to copy media from URI: $uri on attempt $retryCount", e)
+            if (retryCount < 1) {
+                Log.d(TAG, "Retrying media copy in 500ms...")
+                kotlinx.coroutines.delay(500)
+                extractAndSaveMedia(uri, fileName, retryCount + 1)
+            } else {
+                val reason = if (e is SecurityException) "Permission Revoked (SecurityException)"
+                else if (e is java.io.FileNotFoundException) "File Not Found (Likely not downloaded or revoked)"
+                else e.localizedMessage ?: e.javaClass.simpleName
+                Triple(null, null, reason)
             }
         }
     }

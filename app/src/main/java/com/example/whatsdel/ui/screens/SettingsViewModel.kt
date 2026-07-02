@@ -20,7 +20,8 @@ data class SettingsUiState(
     val isStoragePermissionGranted: Boolean = false,
     val isBatteryOptimizationDisabled: Boolean = false,
     val totalMessages: Int = 0,
-    val deletedMessages: Int = 0
+    val deletedMessages: Int = 0,
+    val isRawLoggingEnabled: Boolean = false
 )
 
 @HiltViewModel
@@ -29,11 +30,14 @@ class SettingsViewModel @Inject constructor(
     messageRepository: MessageRepository
 ) : ViewModel() {
 
+    private val sharedPrefs = context.getSharedPreferences("whatsdel_prefs", Context.MODE_PRIVATE)
+
     private val _permissionState = MutableStateFlow(
         SettingsUiState(
             isNotificationAccessGranted = PermissionUtils.isNotificationListenerEnabled(context),
             isStoragePermissionGranted = PermissionUtils.isStoragePermissionGranted(context),
-            isBatteryOptimizationDisabled = PermissionUtils.isBatteryOptimizationDisabled(context)
+            isBatteryOptimizationDisabled = PermissionUtils.isBatteryOptimizationDisabled(context),
+            isRawLoggingEnabled = sharedPrefs.getBoolean("raw_logging_enabled", false)
         )
     )
 
@@ -57,8 +61,14 @@ class SettingsViewModel @Inject constructor(
             currentState.copy(
                 isNotificationAccessGranted = PermissionUtils.isNotificationListenerEnabled(context),
                 isStoragePermissionGranted = PermissionUtils.isStoragePermissionGranted(context),
-                isBatteryOptimizationDisabled = PermissionUtils.isBatteryOptimizationDisabled(context)
+                isBatteryOptimizationDisabled = PermissionUtils.isBatteryOptimizationDisabled(context),
+                isRawLoggingEnabled = sharedPrefs.getBoolean("raw_logging_enabled", false)
             )
         }
+    }
+    
+    fun toggleRawLogging(enabled: Boolean) {
+        sharedPrefs.edit().putBoolean("raw_logging_enabled", enabled).apply()
+        _permissionState.update { it.copy(isRawLoggingEnabled = enabled) }
     }
 }

@@ -12,7 +12,7 @@ import com.example.whatsdel.data.entity.MessageEditHistoryEntity
 
 @Database(
     entities = [MessageEntity::class, MessageEditHistoryEntity::class],
-    version = 6,
+    version = 7,
     exportSchema = true
 )
 abstract class WhatsDelDatabase : RoomDatabase() {
@@ -50,6 +50,14 @@ abstract class WhatsDelDatabase : RoomDatabase() {
         val MIGRATION_5_6 = object : Migration(5, 6) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE messages ADD COLUMN updatedAt INTEGER")
+            }
+        }
+
+        val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE messages ADD COLUMN localMediaPath TEXT")
+                db.execSQL("ALTER TABLE messages ADD COLUMN mediaCaptureSuccess INTEGER")
+                db.execSQL("ALTER TABLE messages ADD COLUMN mediaCaptureFailureReason TEXT")
             }
         }
     }

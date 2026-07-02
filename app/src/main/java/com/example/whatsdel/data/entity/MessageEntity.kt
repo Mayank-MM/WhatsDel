@@ -29,5 +29,9 @@ data class MessageEntity(
     // Phase 4: Edit fields
     val originalMessage: String? = null,
     val editedAt: Long? = null,
-    val updatedAt: Long? = null // Added in v6 for media download timestamps
+    val updatedAt: Long? = null, // Added in v6 for media download timestamps
+    // Phase 5: Media Robustness
+    val localMediaPath: String? = null,
+    val mediaCaptureSuccess: Boolean? = null,
+    val mediaCaptureFailureReason: String? = null
 )

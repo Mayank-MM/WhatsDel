@@ -19,6 +19,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -137,6 +138,32 @@ fun SettingsScreen(
             icon = Icons.Outlined.Info,
             onClick = { /* Future */ }
         )
+        
+        HorizontalDivider(modifier = Modifier.padding(horizontal = 8.dp))
+
+        androidx.compose.foundation.layout.Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 12.dp, horizontal = 16.dp),
+            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+            horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceBetween
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Raw Notification Logging",
+                    style = MaterialTheme.typography.bodyLarge
+                )
+                Text(
+                    text = "Log robust notification data for diagnostic tracing.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Switch(
+                checked = uiState.isRawLoggingEnabled,
+                onCheckedChange = { viewModel.toggleRawLogging(it) }
+            )
+        }
 
         Spacer(modifier = Modifier.height(32.dp))
     }
