@@ -182,6 +182,16 @@ class WhatsDelNotificationListenerService : NotificationListenerService() {
         dataUri: android.net.Uri?,
         fallbackBitmap: Bitmap?
     ) {
+        val messageHash = java.util.Objects.hash(chatName, sender, rawText, timestamp, dataUri?.toString())
+        
+        synchronized(recentMessages) {
+            cleanOldCache(System.currentTimeMillis())
+            if (recentMessages.containsKey(messageHash)) {
+                return
+            }
+            recentMessages[messageHash] = System.currentTimeMillis()
+        }
+
         val fullTextLower = rawText.lowercase()
         
         // 1. Check for deletion
@@ -235,12 +245,28 @@ class WhatsDelNotificationListenerService : NotificationListenerService() {
                             )
                             messageRepository.insertEditHistory(editHistory)
                         }
-                    } else if (existingMessage.hasMedia && existingMessage.updatedAt == null) {
-                        // Mark media as updated (download likely finished)
-                        messageRepository.updateMessage(existingMessage.copy(updatedAt = System.currentTimeMillis()))
-                    } else {
-                        Log.d(TAG, "Duplicate message ignored (exact match): $sender at $timestamp")
+                    } 
+                    
+                    // Check for late media arrival
+                    if (dataUri != null && existingMessage.localMediaPath == null) {
+                        Log.d(TAG, "Late media dataUri detected for existing message: $timestamp")
+                        val fileName = MediaStorageHelper.generateFileName(sender, timestamp, existingMessage.mediaType ?: "file")
+                        val result = extractAndSaveMedia(dataUri, fileName)
+                        if (result.first != null) {
+                            messageRepository.updateMessage(existingMessage.copy(
+                                localMediaPath = result.first,
+                                mediaSize = result.second,
+                                mediaCaptureSuccess = true,
+                                updatedAt = System.currentTimeMillis()
+                            ))
+                        } else {
+                            messageRepository.updateMessage(existingMessage.copy(
+                                mediaCaptureSuccess = false,
+                                mediaCaptureFailureReason = result.third
+                            ))
+                        }
                     }
+                    
                     return@launch
                 }
                 
