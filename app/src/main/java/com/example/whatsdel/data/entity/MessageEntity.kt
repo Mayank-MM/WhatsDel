@@ -1,9 +1,13 @@
 package com.example.whatsdel.data.entity
 
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 
-@Entity(tableName = "messages")
+@Entity(
+    tableName = "messages",
+    indices = [Index(value = ["conversationId"])]
+)
 data class MessageEntity(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,
@@ -33,5 +37,7 @@ data class MessageEntity(
     // Phase 5: Media Robustness
     val localMediaPath: String? = null,
     val mediaCaptureSuccess: Boolean? = null,
-    val mediaCaptureFailureReason: String? = null
+    val mediaCaptureFailureReason: String? = null,
+    // Phase 8: Conversation History
+    val conversationId: Long? = null
 )

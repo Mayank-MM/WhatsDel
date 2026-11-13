@@ -2,22 +2,24 @@ package com.example.whatsdel.data.database
 
 import androidx.room.Database
 import androidx.room.RoomDatabase
-import com.example.whatsdel.data.dao.MessageDao
-import com.example.whatsdel.data.entity.MessageEntity
-
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
-
+import com.example.whatsdel.data.dao.ConversationDao
+import com.example.whatsdel.data.dao.EditHistoryDao
+import com.example.whatsdel.data.dao.MessageDao
+import com.example.whatsdel.data.entity.ConversationEntity
 import com.example.whatsdel.data.entity.MessageEditHistoryEntity
+import com.example.whatsdel.data.entity.MessageEntity
 
 @Database(
-    entities = [MessageEntity::class, MessageEditHistoryEntity::class],
-    version = 7,
+    entities = [MessageEntity::class, MessageEditHistoryEntity::class, ConversationEntity::class],
+    version = 8,
     exportSchema = true
 )
 abstract class WhatsDelDatabase : RoomDatabase() {
     abstract fun messageDao(): MessageDao
-    abstract fun editHistoryDao(): com.example.whatsdel.data.dao.EditHistoryDao
+    abstract fun editHistoryDao(): EditHistoryDao
+    abstract fun conversationDao(): ConversationDao
 
     companion object {
         val MIGRATION_2_3 = object : Migration(2, 3) {
@@ -58,6 +60,30 @@ abstract class WhatsDelDatabase : RoomDatabase() {
                 db.execSQL("ALTER TABLE messages ADD COLUMN localMediaPath TEXT")
                 db.execSQL("ALTER TABLE messages ADD COLUMN mediaCaptureSuccess INTEGER")
                 db.execSQL("ALTER TABLE messages ADD COLUMN mediaCaptureFailureReason TEXT")
+            }
+        }
+
+        val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `conversations` (
+                        `conversationId` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `conversationName` TEXT NOT NULL,
+                        `senderIdentifier` TEXT NOT NULL,
+                        `profileImageUri` TEXT,
+                        `lastMessage` TEXT NOT NULL,
+                        `lastMessageTimestamp` INTEGER NOT NULL,
+                        `messageCount` INTEGER NOT NULL,
+                        `isGroup` INTEGER NOT NULL,
+                        `unreadCount` INTEGER NOT NULL,
+                        `hasDeletedMessages` INTEGER NOT NULL,
+                        `hasEditedMessages` INTEGER NOT NULL,
+                        `createdAt` INTEGER NOT NULL,
+                        `updatedAt` INTEGER NOT NULL
+                    )
+                """.trimIndent())
+                db.execSQL("ALTER TABLE `messages` ADD COLUMN `conversationId` INTEGER")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_messages_conversationId` ON `messages` (`conversationId`)")
             }
         }
     }

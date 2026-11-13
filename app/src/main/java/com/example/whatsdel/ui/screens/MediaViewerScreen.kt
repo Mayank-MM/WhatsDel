@@ -17,35 +17,44 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BrokenImage
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.GetApp
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.StickyNote2
 import androidx.compose.material.icons.filled.Videocam
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
@@ -53,13 +62,17 @@ import com.example.whatsdel.R
 import com.example.whatsdel.data.entity.MessageEntity
 import com.example.whatsdel.ui.components.LoadingIndicator
 import com.example.whatsdel.utils.DateUtils
+import com.example.whatsdel.utils.MediaDownloadHelper
 import java.io.File
 
 @Composable
 fun MediaViewerScreen(
+    onBackClick: () -> Unit = {},
     viewModel: MediaViewerViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    var showDeleteDialog by remember { mutableStateOf(false) }
 
     when {
         uiState.isLoading -> {
@@ -70,32 +83,63 @@ fun MediaViewerScreen(
         }
         uiState.message != null -> {
             val message = uiState.message!!
-            when (message.mediaType) {
-                "image" -> ImageViewer(message = message)
-                "video" -> VideoViewer(message = message)
-                "voice_note" -> AudioViewer(
-                    message = message,
-                    isPlaying = uiState.isPlaying,
-                    progress = uiState.playbackProgress,
-                    onTogglePlayback = { viewModel.togglePlayback() }
-                )
-                "sticker" -> StickerViewer(message = message)
-                else -> MediaUnavailableView()
+            Box(modifier = Modifier.fillMaxSize()) {
+                when (message.mediaType) {
+                    "image" -> ImageViewer(message = message, onDeleteClick = { showDeleteDialog = true })
+                    "video" -> VideoViewer(message = message, onDeleteClick = { showDeleteDialog = true })
+                    "voice_note" -> AudioViewer(
+                        message = message,
+                        isPlaying = uiState.isPlaying,
+                        progress = uiState.playbackProgress,
+                        onTogglePlayback = { viewModel.togglePlayback() },
+                        onDeleteClick = { showDeleteDialog = true }
+                    )
+                    "sticker" -> StickerViewer(message = message, onDeleteClick = { showDeleteDialog = true })
+                    else -> MediaUnavailableView()
+                }
+
+                if (showDeleteDialog) {
+                    AlertDialog(
+                        onDismissRequest = { showDeleteDialog = false },
+                        title = { Text("Delete Media File?") },
+                        text = { Text("Are you sure you want to delete this backed-up media file from WhatsDel and remove it from local storage?") },
+                        confirmButton = {
+                            TextButton(
+                                onClick = {
+                                    showDeleteDialog = false
+                                    viewModel.deleteMediaFile(context) {
+                                        onBackClick()
+                                    }
+                                }
+                            ) {
+                                Text("Delete", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { showDeleteDialog = false }) {
+                                Text("Cancel")
+                            }
+                        }
+                    )
+                }
             }
         }
     }
 }
 
 @Composable
-private fun ImageViewer(message: MessageEntity) {
+private fun ImageViewer(
+    message: MessageEntity,
+    onDeleteClick: () -> Unit
+) {
     var scale by remember { mutableFloatStateOf(1f) }
     var offsetX by remember { mutableFloatStateOf(0f) }
     var offsetY by remember { mutableFloatStateOf(0f) }
 
-    val hasThumbnail = message.thumbnailPath != null && File(message.thumbnailPath).exists()
+    val displayPath = message.localMediaPath ?: message.thumbnailPath
+    val hasMedia = displayPath != null && File(displayPath).exists()
 
     Column(modifier = Modifier.fillMaxSize()) {
-        // Image area with pinch-to-zoom
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -110,9 +154,9 @@ private fun ImageViewer(message: MessageEntity) {
                 },
             contentAlignment = Alignment.Center
         ) {
-            if (hasThumbnail) {
+            if (hasMedia) {
                 AsyncImage(
-                    model = File(message.thumbnailPath!!),
+                    model = File(displayPath!!),
                     contentDescription = "Image",
                     modifier = Modifier
                         .fillMaxSize()
@@ -129,49 +173,77 @@ private fun ImageViewer(message: MessageEntity) {
             }
         }
 
-        // Info bar
-        MediaInfoBar(message = message)
+        MediaInfoBar(message = message, onDeleteClick = onDeleteClick)
     }
 }
 
 @Composable
-private fun VideoViewer(message: MessageEntity) {
-    val hasThumbnail = message.thumbnailPath != null && File(message.thumbnailPath).exists()
+private fun VideoViewer(
+    message: MessageEntity,
+    onDeleteClick: () -> Unit
+) {
+    var isPlaying by remember { mutableStateOf(false) }
+    val videoPath = message.localMediaPath
+    val hasVideoFile = videoPath != null && File(videoPath).exists()
 
     Column(modifier = Modifier.fillMaxSize()) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
-                .background(MaterialTheme.colorScheme.surfaceVariant),
+                .background(Color.Black),
             contentAlignment = Alignment.Center
         ) {
-            if (hasThumbnail) {
-                AsyncImage(
-                    model = File(message.thumbnailPath!!),
-                    contentDescription = "Video Thumbnail",
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Fit
+            if (isPlaying && hasVideoFile) {
+                AndroidView(
+                    factory = { context ->
+                        android.widget.VideoView(context).apply {
+                            setVideoPath(videoPath)
+                            val mediaController = android.widget.MediaController(context)
+                            mediaController.setAnchorView(this)
+                            setMediaController(mediaController)
+                            setOnCompletionListener {
+                                isPlaying = false
+                            }
+                            start()
+                        }
+                    },
+                    modifier = Modifier.fillMaxSize()
                 )
-            }
+            } else {
+                val displayPath = message.thumbnailPath ?: message.localMediaPath
+                if (displayPath != null && File(displayPath).exists()) {
+                    AsyncImage(
+                        model = File(displayPath),
+                        contentDescription = "Video Preview",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Fit
+                    )
+                } else {
+                    MediaPlaceholder(icon = Icons.Filled.Videocam, label = "Video")
+                }
 
-            // Play overlay
-            FloatingActionButton(
-                onClick = { /* Video playback requires URI access, showing thumbnail only */ },
-                containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.9f),
-                shape = CircleShape,
-                modifier = Modifier.size(64.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.PlayArrow,
-                    contentDescription = "Play",
-                    tint = MaterialTheme.colorScheme.onPrimary,
-                    modifier = Modifier.size(36.dp)
-                )
+                FloatingActionButton(
+                    onClick = {
+                        if (hasVideoFile) {
+                            isPlaying = true
+                        }
+                    },
+                    containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.9f),
+                    shape = CircleShape,
+                    modifier = Modifier.size(64.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.PlayArrow,
+                        contentDescription = "Play",
+                        tint = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.size(36.dp)
+                    )
+                }
             }
         }
 
-        MediaInfoBar(message = message)
+        MediaInfoBar(message = message, onDeleteClick = onDeleteClick)
     }
 }
 
@@ -180,7 +252,8 @@ private fun AudioViewer(
     message: MessageEntity,
     isPlaying: Boolean,
     progress: Float,
-    onTogglePlayback: () -> Unit
+    onTogglePlayback: () -> Unit,
+    onDeleteClick: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -189,7 +262,6 @@ private fun AudioViewer(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        // Large mic icon
         Box(
             modifier = Modifier
                 .size(120.dp)
@@ -224,7 +296,6 @@ private fun AudioViewer(
 
         Spacer(modifier = Modifier.height(32.dp))
 
-        // Progress bar
         LinearProgressIndicator(
             progress = { progress },
             modifier = Modifier
@@ -237,7 +308,6 @@ private fun AudioViewer(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Play/Pause button
         FloatingActionButton(
             onClick = onTogglePlayback,
             containerColor = MaterialTheme.colorScheme.primary,
@@ -253,17 +323,17 @@ private fun AudioViewer(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        Text(
-            text = DateUtils.formatTimestamp(message.timestamp),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+        MediaInfoBar(message = message, onDeleteClick = onDeleteClick)
     }
 }
 
 @Composable
-private fun StickerViewer(message: MessageEntity) {
-    val hasThumbnail = message.thumbnailPath != null && File(message.thumbnailPath).exists()
+private fun StickerViewer(
+    message: MessageEntity,
+    onDeleteClick: () -> Unit
+) {
+    val displayPath = message.localMediaPath ?: message.thumbnailPath
+    val hasMedia = displayPath != null && File(displayPath).exists()
 
     Column(modifier = Modifier.fillMaxSize()) {
         Box(
@@ -273,9 +343,9 @@ private fun StickerViewer(message: MessageEntity) {
                 .background(MaterialTheme.colorScheme.surfaceVariant),
             contentAlignment = Alignment.Center
         ) {
-            if (hasThumbnail) {
+            if (hasMedia) {
                 AsyncImage(
-                    model = File(message.thumbnailPath!!),
+                    model = File(displayPath!!),
                     contentDescription = "Sticker",
                     modifier = Modifier
                         .size(250.dp)
@@ -287,12 +357,18 @@ private fun StickerViewer(message: MessageEntity) {
             }
         }
 
-        MediaInfoBar(message = message)
+        MediaInfoBar(message = message, onDeleteClick = onDeleteClick)
     }
 }
 
 @Composable
-private fun MediaInfoBar(message: MessageEntity) {
+private fun MediaInfoBar(
+    message: MessageEntity,
+    onDeleteClick: () -> Unit = {}
+) {
+    val context = LocalContext.current
+    val filePath = message.localMediaPath
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -305,20 +381,54 @@ private fun MediaInfoBar(message: MessageEntity) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = message.sender,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = DateUtils.getRelativeTime(message.timestamp),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = message.sender,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = DateUtils.getRelativeTime(message.timestamp),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    if (filePath != null && File(filePath).exists()) {
+                        IconButton(
+                            onClick = {
+                                MediaDownloadHelper.downloadMediaToPublicStorage(
+                                    context = context,
+                                    srcFile = File(filePath),
+                                    mediaType = message.mediaType ?: "media"
+                                )
+                            }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.GetApp,
+                                contentDescription = "Download Media",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(26.dp)
+                            )
+                        }
+                    }
+
+                    IconButton(onClick = onDeleteClick) {
+                        Icon(
+                            imageVector = Icons.Filled.Delete,
+                            contentDescription = "Delete Media",
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(26.dp)
+                        )
+                    }
+                }
             }
+
             if (message.chatName != message.sender) {
                 Text(
                     text = message.chatName,

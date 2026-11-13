@@ -1,8 +1,13 @@
 package com.example.whatsdel.navigation
 
 sealed class Screen(val route: String) {
+    data object Splash : Screen("splash")
     data object Dashboard : Screen("dashboard")
     data object Messages : Screen("messages")
+    data object Conversations : Screen("conversations")
+    data object ConversationDetail : Screen("conversation_detail/{conversationId}") {
+        fun createRoute(conversationId: Long): String = "conversation_detail/$conversationId"
+    }
     data object Deleted : Screen("deleted")
     data object Settings : Screen("settings")
     data object Media : Screen("media?filter={filter}") {

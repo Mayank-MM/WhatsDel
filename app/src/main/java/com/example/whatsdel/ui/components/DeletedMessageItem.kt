@@ -24,11 +24,13 @@ import com.example.whatsdel.utils.DateUtils
 @Composable
 fun DeletedMessageItem(
     message: MessageEntity,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit = {}
 ) {
     val isGroup = message.sender != message.chatName
 
     Surface(
+        onClick = onClick,
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 6.dp),

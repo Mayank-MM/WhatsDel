@@ -1,7 +1,9 @@
 package com.example.whatsdel.data.repository
 
+import com.example.whatsdel.data.dao.ConversationDao
 import com.example.whatsdel.data.dao.EditHistoryDao
 import com.example.whatsdel.data.dao.MessageDao
+import com.example.whatsdel.data.entity.ConversationEntity
 import com.example.whatsdel.data.entity.MessageEditHistoryEntity
 import com.example.whatsdel.data.entity.MessageEntity
 import com.example.whatsdel.domain.repository.MessageRepository
@@ -12,7 +14,8 @@ import javax.inject.Singleton
 @Singleton
 class MessageRepositoryImpl @Inject constructor(
     private val messageDao: MessageDao,
-    private val editHistoryDao: EditHistoryDao
+    private val editHistoryDao: EditHistoryDao,
+    private val conversationDao: ConversationDao
 ) : MessageRepository {
 
     override fun observeActiveMessages(): Flow<List<MessageEntity>> =
@@ -121,4 +124,81 @@ class MessageRepositoryImpl @Inject constructor(
 
     override suspend fun countDuplicateEdits(messageId: Long, newText: String): Int =
         editHistoryDao.countDuplicateEdits(messageId, newText)
+
+    // Phase 8: Conversations
+    override fun observeAllConversations(): Flow<List<ConversationEntity>> =
+        conversationDao.observeAllConversations()
+
+    override fun searchConversations(query: String): Flow<List<ConversationEntity>> =
+        conversationDao.searchConversations(query)
+
+    override suspend fun getConversationById(id: Long): ConversationEntity? =
+        conversationDao.getConversationById(id)
+
+    override suspend fun findConversationByName(name: String): ConversationEntity? =
+        conversationDao.findConversationByName(name)
+
+    override suspend fun getOrCreateConversation(
+        chatName: String,
+        sender: String,
+        isGroup: Boolean,
+        lastMessageText: String,
+        timestamp: Long,
+        isDeleted: Boolean,
+        isEdited: Boolean
+    ): ConversationEntity {
+        val cleanName = com.example.whatsdel.utils.MediaStorageHelper.sanitizeChatName(chatName)
+        val existing = conversationDao.findConversationByName(cleanName)
+            ?: conversationDao.findConversationByName(chatName)
+
+        if (existing != null) {
+            val updated = existing.copy(
+                conversationName = cleanName,
+                lastMessage = if (lastMessageText.isNotBlank()) lastMessageText else existing.lastMessage,
+                lastMessageTimestamp = Math.max(existing.lastMessageTimestamp, timestamp),
+                messageCount = existing.messageCount + 1,
+                unreadCount = existing.unreadCount + 1,
+                hasDeletedMessages = existing.hasDeletedMessages || isDeleted,
+                hasEditedMessages = existing.hasEditedMessages || isEdited,
+                updatedAt = System.currentTimeMillis()
+            )
+            conversationDao.updateConversation(updated)
+            return updated
+        } else {
+            val newConversation = ConversationEntity(
+                conversationName = cleanName,
+                senderIdentifier = sender,
+                lastMessage = lastMessageText.ifBlank { "Message received" },
+                lastMessageTimestamp = timestamp,
+                messageCount = 1,
+                unreadCount = 1,
+                isGroup = isGroup,
+                hasDeletedMessages = isDeleted,
+                hasEditedMessages = isEdited,
+                createdAt = System.currentTimeMillis(),
+                updatedAt = System.currentTimeMillis()
+            )
+            val newId = conversationDao.insertConversation(newConversation)
+            return newConversation.copy(conversationId = newId)
+        }
+    }
+
+    override fun observeMessagesForConversation(conversationId: Long, chatName: String): Flow<List<MessageEntity>> =
+        conversationDao.observeMessagesForConversation(conversationId, chatName)
+
+    override fun getConversationCount(): Flow<Int> =
+        conversationDao.getConversationCount()
+
+    override suspend fun clearConversationHistory(conversationId: Long, chatName: String) {
+        messageDao.deleteMessagesForConversation(conversationId, chatName)
+        conversationDao.deleteConversationById(conversationId)
+    }
+
+    override suspend fun markConversationAsRead(conversationId: Long, chatName: String) {
+        conversationDao.markConversationAsRead(conversationId, chatName)
+    }
+
+    override suspend fun deleteAllMedia() {
+        messageDao.deleteAllMediaMessages()
+    }
 }

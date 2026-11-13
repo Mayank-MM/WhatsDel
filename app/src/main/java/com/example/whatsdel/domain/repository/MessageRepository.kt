@@ -1,5 +1,6 @@
 package com.example.whatsdel.domain.repository
 
+import com.example.whatsdel.data.entity.ConversationEntity
 import com.example.whatsdel.data.entity.MessageEditHistoryEntity
 import com.example.whatsdel.data.entity.MessageEntity
 import kotlinx.coroutines.flow.Flow
@@ -77,4 +78,33 @@ interface MessageRepository {
     suspend fun getEditHistory(messageId: Long): List<MessageEditHistoryEntity>
 
     suspend fun countDuplicateEdits(messageId: Long, newText: String): Int
+
+    // Phase 8: Conversations
+    fun observeAllConversations(): Flow<List<ConversationEntity>>
+
+    fun searchConversations(query: String): Flow<List<ConversationEntity>>
+
+    suspend fun getConversationById(id: Long): ConversationEntity?
+
+    suspend fun findConversationByName(name: String): ConversationEntity?
+
+    suspend fun getOrCreateConversation(
+        chatName: String,
+        sender: String,
+        isGroup: Boolean,
+        lastMessageText: String,
+        timestamp: Long,
+        isDeleted: Boolean = false,
+        isEdited: Boolean = false
+    ): ConversationEntity
+
+    fun observeMessagesForConversation(conversationId: Long, chatName: String): Flow<List<MessageEntity>>
+
+    fun getConversationCount(): Flow<Int>
+
+    suspend fun clearConversationHistory(conversationId: Long, chatName: String)
+
+    suspend fun markConversationAsRead(conversationId: Long, chatName: String)
+
+    suspend fun deleteAllMedia()
 }

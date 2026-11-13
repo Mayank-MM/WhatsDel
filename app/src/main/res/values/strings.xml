@@ -3,6 +3,7 @@
 
     <!-- Navigation -->
     <string name="nav_dashboard">Dashboard</string>
+    <string name="nav_conversations">Conversations</string>
     <string name="nav_messages">Messages</string>
     <string name="nav_deleted">Deleted</string>
     <string name="nav_settings">Settings</string>

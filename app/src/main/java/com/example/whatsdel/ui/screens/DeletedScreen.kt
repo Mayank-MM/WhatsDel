@@ -35,6 +35,7 @@ import com.example.whatsdel.ui.components.LoadingIndicator
 
 @Composable
 fun DeletedScreen(
+    onMessageClick: (Long) -> Unit = {},
     viewModel: DeletedViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -105,7 +106,10 @@ fun DeletedScreen(
                             items = uiState.deletedMessages,
                             key = { it.id }
                         ) { message ->
-                            DeletedMessageItem(message = message)
+                            DeletedMessageItem(
+                                message = message,
+                                onClick = { onMessageClick(message.id) }
+                            )
                         }
                     }
                 }

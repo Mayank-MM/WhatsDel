@@ -1,10 +1,14 @@
 package com.example.whatsdel.ui.screens
 
+import android.content.Context
+import android.util.Log
+import android.widget.Toast
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.whatsdel.data.entity.MessageEntity
 import com.example.whatsdel.domain.repository.MessageRepository
+import com.example.whatsdel.utils.MediaStorageHelper
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -14,6 +18,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
+import java.io.File
 import javax.inject.Inject
 
 enum class MediaFilter(val label: String, val dbType: String?) {
@@ -82,5 +88,54 @@ class MediaViewModel @Inject constructor(
 
     fun onSearchQueryChanged(query: String) {
         _searchQuery.value = query
+    }
+
+    fun deleteMedia(message: MessageEntity, context: Context) {
+        viewModelScope.launch {
+            try {
+                message.localMediaPath?.let { path ->
+                    val file = File(path)
+                    if (file.exists()) file.delete()
+                }
+                message.thumbnailPath?.let { path ->
+                    val thumb = File(path)
+                    if (thumb.exists()) thumb.delete()
+                }
+                messageRepository.deleteMessage(message)
+                Toast.makeText(context, "Media file deleted", Toast.LENGTH_SHORT).show()
+            } catch (e: Exception) {
+                Toast.makeText(context, "Failed to delete: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    fun deleteAllMedia(context: Context) {
+        viewModelScope.launch {
+            try {
+                // Wipe app-private media directory
+                val mediaDir = MediaStorageHelper.getWhatsDelMediaDirectory(context)
+                if (mediaDir.exists() && mediaDir.isDirectory) {
+                    mediaDir.listFiles()?.forEach { file ->
+                        if (file.isFile) file.delete()
+                    }
+                }
+
+                // Wipe thumbnails directory
+                val thumbDir = File(context.filesDir, "thumbnails")
+                if (thumbDir.exists() && thumbDir.isDirectory) {
+                    thumbDir.listFiles()?.forEach { file ->
+                        if (file.isFile) file.delete()
+                    }
+                }
+
+                // Wipe all media records from database
+                messageRepository.deleteAllMedia()
+
+                Toast.makeText(context, "All backed-up media files deleted", Toast.LENGTH_SHORT).show()
+            } catch (e: Exception) {
+                Log.e("MediaViewModel", "Error deleting all media", e)
+                Toast.makeText(context, "Failed to delete all media: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+            }
+        }
     }
 }

@@ -2,6 +2,8 @@ package com.example.whatsdel.di
 
 import android.content.Context
 import androidx.room.Room
+import com.example.whatsdel.data.dao.ConversationDao
+import com.example.whatsdel.data.dao.EditHistoryDao
 import com.example.whatsdel.data.dao.MessageDao
 import com.example.whatsdel.data.database.WhatsDelDatabase
 import dagger.Module
@@ -30,8 +32,10 @@ object DatabaseModule {
                 WhatsDelDatabase.MIGRATION_3_4,
                 WhatsDelDatabase.MIGRATION_4_5,
                 WhatsDelDatabase.MIGRATION_5_6,
-                WhatsDelDatabase.MIGRATION_6_7
+                WhatsDelDatabase.MIGRATION_6_7,
+                WhatsDelDatabase.MIGRATION_7_8
             )
+            .fallbackToDestructiveMigrationOnDowngrade(true)
             .build()
     }
 
@@ -43,7 +47,13 @@ object DatabaseModule {
 
     @Provides
     @Singleton
-    fun provideEditHistoryDao(database: WhatsDelDatabase): com.example.whatsdel.data.dao.EditHistoryDao {
+    fun provideEditHistoryDao(database: WhatsDelDatabase): EditHistoryDao {
         return database.editHistoryDao()
+    }
+
+    @Provides
+    @Singleton
+    fun provideConversationDao(database: WhatsDelDatabase): ConversationDao {
+        return database.conversationDao()
     }
 }

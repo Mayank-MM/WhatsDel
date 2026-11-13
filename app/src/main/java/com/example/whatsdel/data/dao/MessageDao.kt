@@ -15,7 +15,7 @@ interface MessageDao {
     @Query("SELECT * FROM messages WHERE isDeleted = 0 ORDER BY timestamp DESC")
     fun observeActiveMessages(): Flow<List<MessageEntity>>
 
-    @Query("SELECT * FROM messages WHERE isDeleted = 1 ORDER BY deletedTimestamp DESC")
+    @Query("SELECT * FROM messages WHERE isDeleted = 1 ORDER BY COALESCE(deletedTimestamp, timestamp) DESC")
     fun observeDeletedMessages(): Flow<List<MessageEntity>>
 
     @Query("SELECT * FROM messages WHERE isEdited = 1 ORDER BY editedAt DESC")
@@ -33,7 +33,7 @@ interface MessageDao {
     @Query("SELECT COUNT(*) FROM messages WHERE isEdited = 1")
     fun getEditedCount(): Flow<Int>
 
-    @Query("SELECT COUNT(*) FROM messages WHERE mediaPath IS NOT NULL")
+    @Query("SELECT COUNT(*) FROM messages WHERE hasMedia = 1 OR localMediaPath IS NOT NULL")
     fun getMediaCount(): Flow<Int>
 
     // Phase 4: Media queries
@@ -96,7 +96,7 @@ interface MessageDao {
         AND (sender LIKE '%' || :query || '%' 
         OR chatName LIKE '%' || :query || '%' 
         OR message LIKE '%' || :query || '%')
-        ORDER BY deletedTimestamp DESC
+        ORDER BY COALESCE(deletedTimestamp, timestamp) DESC
     """)
     fun searchDeletedMessages(query: String): Flow<List<MessageEntity>>
 
@@ -147,4 +147,10 @@ interface MessageDao {
 
     @Query("SELECT * FROM messages WHERE id = :id")
     suspend fun getMessageById(id: Long): MessageEntity?
+
+    @Query("DELETE FROM messages WHERE conversationId = :conversationId OR (conversationId IS NULL AND (chatName = :chatName OR sender = :chatName))")
+    suspend fun deleteMessagesForConversation(conversationId: Long, chatName: String)
+
+    @Query("DELETE FROM messages WHERE hasMedia = 1 OR localMediaPath IS NOT NULL")
+    suspend fun deleteAllMediaMessages()
 }

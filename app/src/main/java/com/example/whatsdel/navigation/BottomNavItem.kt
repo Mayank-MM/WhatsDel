@@ -1,13 +1,13 @@
 package com.example.whatsdel.navigation
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Chat
+import androidx.compose.material.icons.automirrored.outlined.Chat
 import androidx.compose.material.icons.filled.Dashboard
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Message
 import androidx.compose.material.icons.filled.PermMedia
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.Dashboard
-import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Message
 import androidx.compose.material.icons.outlined.PermMedia
 import androidx.compose.material.icons.outlined.Settings
@@ -29,6 +29,12 @@ val bottomNavItems = listOf(
         route = Screen.Dashboard.route
     ),
     BottomNavItem(
+        titleResId = R.string.nav_conversations,
+        selectedIcon = Icons.AutoMirrored.Filled.Chat,
+        unselectedIcon = Icons.AutoMirrored.Outlined.Chat,
+        route = Screen.Conversations.route
+    ),
+    BottomNavItem(
         titleResId = R.string.nav_messages,
         selectedIcon = Icons.Filled.Message,
         unselectedIcon = Icons.Outlined.Message,
@@ -39,12 +45,6 @@ val bottomNavItems = listOf(
         selectedIcon = Icons.Filled.PermMedia,
         unselectedIcon = Icons.Outlined.PermMedia,
         route = Screen.Media.createRoute()
-    ),
-    BottomNavItem(
-        titleResId = R.string.nav_deleted,
-        selectedIcon = Icons.Filled.Delete,
-        unselectedIcon = Icons.Outlined.Delete,
-        route = Screen.Deleted.route
     ),
     BottomNavItem(
         titleResId = R.string.nav_settings,

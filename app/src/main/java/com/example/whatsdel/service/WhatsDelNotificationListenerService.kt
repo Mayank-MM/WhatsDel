@@ -35,15 +35,37 @@ class WhatsDelNotificationListenerService : NotificationListenerService() {
         "you deleted this message",
         "message was deleted",
         "deleted this message",
+        "this photo was deleted",
+        "this video was deleted",
+        "this audio was deleted",
+        "this media was deleted",
+        "photo was deleted",
+        "video was deleted",
+        "audio was deleted",
+        "media was deleted",
+        "this document was deleted",
+        "this sticker was deleted",
+        "you deleted a message",
+        "you deleted this photo",
+        "you deleted this video",
+        "deleted",
         // Hindi
         "यह मैसेज डिलीट कर दिया गया",
         "आपने यह मैसेज डिलीट कर दिया",
+        "यह फोटो डिलीट",
+        "यह वीडियो डिलीट",
+        "डिलीट कर दिया गया",
+        "डिलीट",
         // Spanish
         "este mensaje fue eliminado",
         "eliminaste este mensaje",
+        "fue eliminado",
+        "eliminado",
         // Portuguese
         "esta mensagem foi apagada",
-        "você apagou esta mensagem"
+        "você apagou esta mensagem",
+        "foi apagada",
+        "apagado"
     )
 
     // Media detection patterns (WhatsApp uses these emoji+text combos in notifications)
@@ -51,6 +73,7 @@ class WhatsDelNotificationListenerService : NotificationListenerService() {
         "image" to listOf("📷 photo", "📷 image", "photo", "image"),
         "video" to listOf("📹 video", "🎥 video", "video"),
         "voice_note" to listOf("🎤 voice message", "🎵 audio", "voice message", "🎤", "ptt"),
+        "document" to listOf("📄 document", "📄", "document", ".pdf", ".docx", ".xlsx", ".txt", ".zip", ".apk"),
         "sticker" to listOf("sticker")
     )
 
@@ -196,8 +219,10 @@ class WhatsDelNotificationListenerService : NotificationListenerService() {
         
         // 1. Check for deletion
         val isDeletedText = deletionIndicators.any { fullTextLower.contains(it) }
-        val isDeletedFuzzy = (fullTextLower.contains("deleted") && fullTextLower.contains("message")) || 
-                             (fullTextLower.contains("डिलीट") && fullTextLower.contains("मैसेज"))
+        val isDeletedFuzzy = fullTextLower.contains("deleted") || 
+                             fullTextLower.contains("डिलीट") || 
+                             fullTextLower.contains("eliminad") || 
+                             fullTextLower.contains("apagad")
 
         if (isDeletedText || isDeletedFuzzy) {
             handleDeletion(chatName, sender, rawText, notificationId, timestamp)
@@ -327,6 +352,14 @@ class WhatsDelNotificationListenerService : NotificationListenerService() {
                     rawText
                 }
 
+                val conversation = messageRepository.getOrCreateConversation(
+                    chatName = chatName,
+                    sender = sender,
+                    isGroup = chatName != sender,
+                    lastMessageText = messageText,
+                    timestamp = timestamp
+                )
+
                 val messageEntity = MessageEntity(
                     sender = sender,
                     chatName = chatName,
@@ -353,7 +386,8 @@ class WhatsDelNotificationListenerService : NotificationListenerService() {
                     updatedAt = if (hasMedia && (captureSuccess == true)) System.currentTimeMillis() else null,
                     localMediaPath = localMediaPath,
                     mediaCaptureSuccess = captureSuccess,
-                    mediaCaptureFailureReason = failureReason
+                    mediaCaptureFailureReason = failureReason,
+                    conversationId = conversation.conversationId
                 )
 
                 messageRepository.insertMessage(messageEntity)
@@ -408,12 +442,36 @@ class WhatsDelNotificationListenerService : NotificationListenerService() {
             }
         }
 
-        // Additional heuristic: WhatsApp sometimes sends "📷" alone for photos
-        if (textLower.contains("📷") || textLower.contains("\uD83D\uDCF7")) return "image"
-        if (textLower.contains("📹") || textLower.contains("🎥")) return "video"
-        if (textLower.contains("🎤")) return "voice_note"
+        // Additional heuristics
+        if (textLower.contains("📷") || textLower.contains("\uD83D\uDCF7") || textLower.contains("photo") || textLower.contains("image")) return "image"
+        if (textLower.contains("📹") || textLower.contains("🎥") || textLower.contains("video")) return "video"
+        if (textLower.contains("🎤") || textLower.contains("🎵") || textLower.contains("voice") || textLower.contains("audio") || textLower.contains("ptt")) return "voice_note"
+        if (textLower.contains("📄") || textLower.contains("document") || textLower.endsWith(".pdf") || textLower.endsWith(".docx") || textLower.endsWith(".xlsx") || textLower.endsWith(".txt") || textLower.endsWith(".zip") || textLower.endsWith(".apk")) return "document"
 
         return null
+    }
+
+    private var mediaObserver: com.example.whatsdel.utils.WhatsAppMediaObserver? = null
+
+    override fun onCreate() {
+        super.onCreate()
+        com.example.whatsdel.utils.NotificationHelper.createNotificationChannel(this)
+
+        try {
+            mediaObserver = com.example.whatsdel.utils.WhatsAppMediaObserver(applicationContext, messageRepository)
+            mediaObserver?.startWatching()
+
+            // Run initial background scan of WhatsApp media folders
+            com.example.whatsdel.utils.WhatsAppMediaBackupManager.scanWhatsAppMediaFolders(applicationContext, messageRepository)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to start WhatsAppMediaObserver", e)
+        }
+    }
+
+    override fun onDestroy() {
+        mediaObserver?.stopWatching()
+        mediaObserver = null
+        super.onDestroy()
     }
 
     private fun handleDeletion(chatName: String, sender: String, fullText: String, notificationId: Int, timestamp: Long) {
@@ -422,25 +480,82 @@ class WhatsDelNotificationListenerService : NotificationListenerService() {
                 // METHOD 1: Try exact match via Timestamp (Bulletproof for MessagingStyle)
                 var matchingMessage = messageRepository.findMessageByExactTimestamp(chatName, sender, timestamp)
 
-                // METHOD 2: Fuzzy fallback scanning recent messages
+                // METHOD 2: Find the most recent active (non-deleted) message in this chat
                 if (matchingMessage == null) {
                     val recentMessagesList = messageRepository.getRecentActiveMessages()
-                    matchingMessage = recentMessagesList.firstOrNull { 
-                        it.chatName == chatName && (fullText.contains(it.sender.lowercase()) || fullText.contains(it.chatName.lowercase()))
+                    matchingMessage = recentMessagesList.firstOrNull { msg ->
+                        msg.chatName.equals(chatName, ignoreCase = true) && !msg.isDeleted &&
+                        (sender.isBlank() || msg.sender.equals(sender, ignoreCase = true) || chatName.equals(sender, ignoreCase = true))
+                    } ?: recentMessagesList.firstOrNull { msg ->
+                        msg.chatName.equals(chatName, ignoreCase = true) && !msg.isDeleted
                     }
                 }
 
-                if (matchingMessage != null && !matchingMessage.isDeleted) {
-                    messageRepository.markAsDeleted(
-                        id = matchingMessage.id,
-                        deletedTimestamp = System.currentTimeMillis(),
-                        isDeleted = true
+                if (matchingMessage != null) {
+                    if (!matchingMessage.isDeleted) {
+                        messageRepository.markAsDeleted(
+                            id = matchingMessage.id,
+                            deletedTimestamp = System.currentTimeMillis(),
+                            isDeleted = true
+                        )
+                        Log.d(TAG, "Message marked as deleted: ${matchingMessage.message}")
+                    }
+
+                    notifyUserIfEnabled(
+                        sender = matchingMessage.sender,
+                        chatName = matchingMessage.chatName,
+                        originalMessage = matchingMessage.message,
+                        mediaType = matchingMessage.mediaType,
+                        messageId = matchingMessage.id
                     )
-                    Log.d(TAG, "Message marked as deleted: ${matchingMessage.message}")
+                } else {
+                    val actualSender = sender.ifBlank { chatName }
+                    val placeholderEntity = MessageEntity(
+                        sender = actualSender,
+                        chatName = chatName,
+                        message = "This message was deleted",
+                        timestamp = timestamp,
+                        packageName = "com.whatsapp",
+                        notificationId = notificationId,
+                        messageType = "text",
+                        isDeleted = true,
+                        deletedTimestamp = System.currentTimeMillis()
+                    )
+                    messageRepository.insertMessage(placeholderEntity)
+                    Log.d(TAG, "Created deleted message placeholder in DB for $actualSender in $chatName")
+
+                    notifyUserIfEnabled(
+                        sender = actualSender,
+                        chatName = chatName,
+                        originalMessage = "",
+                        mediaType = null,
+                        messageId = timestamp
+                    )
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to handle deletion", e)
             }
+        }
+    }
+
+    private fun notifyUserIfEnabled(
+        sender: String,
+        chatName: String,
+        originalMessage: String,
+        mediaType: String?,
+        messageId: Long
+    ) {
+        val sharedPrefs = applicationContext.getSharedPreferences("whatsdel_prefs", android.content.Context.MODE_PRIVATE)
+        val notificationsEnabled = sharedPrefs.getBoolean("deleted_notifications_enabled", true)
+        if (notificationsEnabled) {
+            com.example.whatsdel.utils.NotificationHelper.showDeletedMessageNotification(
+                context = applicationContext,
+                sender = sender,
+                chatName = chatName,
+                originalMessage = originalMessage,
+                mediaType = mediaType,
+                messageId = messageId
+            )
         }
     }
 
