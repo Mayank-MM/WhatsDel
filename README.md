@@ -1,206 +1,109 @@
-# WhatsDel
+# WhatsDel 🛡️
 
-WhatsDel is a modern Android application that captures WhatsApp notifications and preserves message history locally. It silently records incoming WhatsApp notifications and stores them on the device. When supported notification updates indicate that a message has been deleted or edited, WhatsDel preserves the original content for later viewing—all completely offline, with no cloud or server dependency.
+**WhatsDel** is a modern, privacy-focused Android application built with **Jetpack Compose** and **Material 3** that captures WhatsApp notifications, backs up media files, and preserves complete message history locally.
+
+It silently records incoming WhatsApp text messages, photos, videos, voice notes, and documents. When supported notification updates indicate that a message has been deleted or edited, WhatsDel preserves the original content for offline viewing with zero cloud or server dependencies.
 
 > **Disclaimer:** WhatsDel is an independent project and is not affiliated with, endorsed by, or sponsored by WhatsApp or Meta.
 
 ---
 
-# 🚀 Features
+## 🚀 Key Features
 
-* **Deleted Message Recovery**: Detects supported WhatsApp notification updates indicating a deleted message and preserves the original text captured earlier.
-* **Edited Message History**: Preserves both the original and edited versions of supported text messages along with their edit history.
-* **Real-time Notification Monitoring**: Background service captures incoming WhatsApp notifications using `NotificationListenerService`.
-* **Live Dashboard**: Displays real-time statistics for captured, deleted, edited, and supported media messages.
-* **Messages Feed**: Browse captured messages with sender, chat name, preview, timestamp, and status badges.
-* **Deleted Messages Screen**: Dedicated screen showing recovered deleted messages.
-* **Edited Messages Screen**: Compare original and edited versions with complete edit history.
-* **Media Detection**: Detects supported media notifications and stores available metadata.
-* **Search & Filtering**: Search across sender, chat name, and message content.
-* **Smart Deduplication**: Prevents duplicate entries caused by repeated notification updates.
-* **Group Chat Support**: Correctly separates sender and group information.
-* **Permission Management**: Guides users through enabling Notification Access and other required permissions.
-* **Material 3 Design**: Modern UI with dynamic colors, dark mode, and responsive layouts.
+* **Deleted Message Recovery**: Automatically detects deleted WhatsApp messages and alerts you via high-priority notifications with recovered original text and media.
+* **Edited Message Timeline**: Preserves both original and edited message versions with edit timestamps and comparison cards.
+* **Conversation-Wise Chat History**: Organizes messages into contact and group conversation threads with circular avatar initials/group icons, last message previews, timestamps, date separators, and rich chat bubbles.
+* **Real-Time Media Backup Engine**: Background `FileObserver` engine backing up:
+  - **Photos & Images** (`.jpg`, `.jpeg`, `.png`, `.webp`)
+  - **Videos** (`.mp4`, `.3gp`, `.mkv`)
+  - **Voice Notes & Audio** (`.opus`, `.ogg`, `.m4a`, `.aac`, `.mp3`)
+  - **Document Files** (`.pdf`, `.doc`, `.docx`, `.xls`, `.xlsx`, `.ppt`, `.pptx`, `.txt`, `.zip`, `.rar`, `.apk`, `.csv`)
+* **Gallery & Public Media Export**: Download backed-up media files directly to your phone's public Gallery (`Pictures/WhatsDel Downloads/` & `Movies/WhatsDel Downloads/`) or Downloads folder with instant OS indexing (`MediaScannerConnection`).
+* **Export & Clear Conversation**: Export formatted plain-text conversation logs (`.txt`) via system share sheet (`ACTION_SEND`) or clear captured history with confirmation dialogs.
+* **Group Title Sanitization**: Strips WhatsApp notification count suffixes (e.g. `" (4 messages)"` -> `"Vikings⚔️ Club"`) and merges duplicate entries.
+* **Material 3 Light & Dark Themes**: Interactive Theme Selector dialog (**System Default**, **Light Theme** `#F8F9FA`, **Dark Theme** `#121417`) with custom WhatsApp Teal palette.
+* **Live Overview Dashboard**: Real-time 2x2 statistics grid (**Conversations**, **Total Messages**, **Edited**, **Media Files**) and recent captured activity feed.
+* **Storage Cleanup**: Individual file deletion and bulk **Clear All Media** controls with confirmation dialogs.
 
 ---
 
-# 🛠️ Tech Stack
+## 🛠️ Tech Stack & Architecture
 
 * **Language:** Kotlin 2.0
-* **UI Framework:** Jetpack Compose
-* **Architecture:** MVVM (Model-View-ViewModel)
+* **UI Framework:** Jetpack Compose (Material 3)
+* **Architecture:** MVVM (Model-View-ViewModel) with Clean Architecture principles
 * **Dependency Injection:** Dagger Hilt
-* **Database:** Room (KSP)
-* **Navigation:** Navigation Compose
+* **Database:** Room (Database Schema v8 with KSP migrations)
+* **Navigation:** Navigation Compose (5-destination Bottom Navigation Bar)
+* **Background Monitoring:** `NotificationListenerService` & `FileObserver`
 * **Reactive Programming:** Kotlin Coroutines & StateFlow
-* **Build System:** Gradle Kotlin DSL with Version Catalogs
 
 ---
 
-# 🏗️ Project Structure
+## 🏗️ Project Structure
 
 ```text
 app/src/main/java/com/example/whatsdel/
  ├── data/
- ├── di/
- ├── domain/
- ├── navigation/
- ├── service/
+ │    ├── dao/           # ConversationDao, MessageDao, EditHistoryDao
+ │    ├── database/      # WhatsDelDatabase (v8 & Migrations)
+ │    ├── entity/        # MessageEntity, ConversationEntity, MessageEditHistoryEntity
+ │    └── repository/    # MessageRepositoryImpl
+ ├── di/                 # Hilt Database & Repository Modules
+ ├── domain/             # MessageRepository Interface & Domain Models
+ ├── navigation/         # NavGraph, Screen routes, BottomNavItem
+ ├── service/            # WhatsDelNotificationListenerService
  ├── ui/
- │    ├── components/
- │    ├── screens/
- │    └── theme/
- └── utils/
+ │    ├── components/    # StatCard, ConversationItem, MessageItem, MediaGridItem, etc.
+ │    ├── screens/       # Dashboard, Conversations, Detail, Messages, Deleted, Media, Settings
+ │    └── theme/         # Material 3 Color, Theme, Type
+ └── utils/              # MediaDownloadHelper, WhatsAppMediaObserver, WhatsAppMediaBackupManager
 ```
 
 ---
 
-# ⚙️ How to Build and Run
+## ⚙️ How to Build and Run
 
-## Android Studio
+### Android Studio
 
-1. Open Android Studio.
-2. Open the project.
-3. Wait for Gradle Sync.
-4. Connect a physical device or start an emulator.
-5. Run the application.
+1. Open Android Studio (2024.1+ / Jellyfish / Ladybug).
+2. Open the project directory.
+3. Wait for Gradle Sync to complete.
+4. Connect a physical Android device (Android 7.0+ / API 24+) or start an emulator.
+5. Click **Run 'app'** (`Shift + F10`).
 
-## Command Line
+### Command Line
 
 ```bash
+# Build Debug APK
 ./gradlew assembleDebug
 
+# Install on connected device
 adb install -r -t app/build/outputs/apk/debug/app-debug.apk
 
+# Launch App
 adb shell am start -n "com.example.whatsdel/.MainActivity"
 ```
 
 ---
 
-# 🔒 Required Permissions
+## 🔒 Required Permissions
 
-* Notification Access
-* Storage Access (where applicable)
-* Ignore Battery Optimization (recommended)
-
----
-
-# ⚠️ Current Limitations
-
-WhatsDel is built entirely on Android's public APIs. Because of Android's security model and WhatsApp's end-to-end encryption, there are important limitations.
-
-### Notification-Based Architecture
-
-WhatsDel captures information **only from WhatsApp notifications**.
-
-It does **not** access WhatsApp's private database or encrypted message storage.
+* **Notification Access**: Required to capture incoming WhatsApp notifications in the background.
+* **Storage Access**: Required to observe WhatsApp media folders and backup media files.
+* **Ignore Battery Optimization**: Recommended to prevent Android from killing the background monitoring service.
 
 ---
 
-### Deleted Message Recovery
+## 🔒 Privacy & Security
 
-Deleted messages can only be recovered if:
-
-* The original notification was received.
-* WhatsDel was running with Notification Access enabled.
-* The message was captured before it was deleted.
-
-Messages that were never shown in a notification cannot be recovered.
+WhatsDel is designed with privacy as its highest priority:
+- All captured messages, media backups, and database records are **strictly stored on your device only**.
+- Zero cloud servers, analytics trackers, or external network requests.
+- Does not modify or access WhatsApp's internal database or encrypted storage.
 
 ---
 
-### Edited Message Detection
-
-Edited message history depends on WhatsApp issuing a notification update.
-
-If WhatsApp does not update the notification, the edit cannot be detected.
-
----
-
-### Media Recovery
-
-Media support depends on what Android exposes through notifications.
-
-While WhatsDel can detect media notifications and capture available metadata, Android does not generally provide direct access to WhatsApp's private media files.
-
-As a result:
-
-* Images, videos, voice notes, stickers, and documents cannot always be recovered automatically.
-* Recovery depends on the information made available by Android and WhatsApp.
-* Some media types may only have metadata available rather than the original file.
-
----
-
-### Notification Dependency
-
-WhatsDel may not capture messages if:
-
-* Notification Access is disabled.
-* WhatsApp notifications are turned off.
-* The message does not generate a notification.
-* Android suppresses notifications under certain conditions.
-
----
-
-### Android Security
-
-WhatsDel does **not**:
-
-* Read WhatsApp's encrypted database.
-* Bypass Android sandbox restrictions.
-* Circumvent WhatsApp security mechanisms.
-* Access private application storage without permission.
-
-The application intentionally relies only on Android-supported mechanisms.
-
----
-
-# 🗺️ Roadmap
-
-## ✅ Phase 1
-
-* Project foundation
-* MVVM architecture
-* Room database
-* Material 3 UI
-
-## ✅ Phase 2
-
-* Notification monitoring
-* Message capture
-* Smart deduplication
-
-## ✅ Phase 3
-
-* Deleted message recovery
-* Search
-* Sort
-* Dashboard
-* Settings
-
-## ✅ Phase 4
-
-* Edited message detection
-* Edit history timeline
-* Edited messages screen
-* Dashboard analytics
-
-## 🚧 Planned
-
-* Advanced global search
-* Chat-based organization
-* Timeline view
-* Local backup & restore
-* Database encryption
-* PIN/Biometric lock
-* Export (JSON, CSV, PDF)
-* Performance optimizations
-* Additional UI enhancements
-
----
-
-# 📄 License
+## 📄 License
 
 This project is intended for educational, research, and personal use.
-
-Users are responsible for complying with applicable laws, platform policies, and the privacy of anyone whose data may be processed by the application.
