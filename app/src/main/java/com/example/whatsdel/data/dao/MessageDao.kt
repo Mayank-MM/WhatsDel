@@ -33,11 +33,22 @@ interface MessageDao {
     @Query("SELECT COUNT(*) FROM messages WHERE isEdited = 1")
     fun getEditedCount(): Flow<Int>
 
-    @Query("SELECT COUNT(*) FROM messages WHERE hasMedia = 1 OR localMediaPath IS NOT NULL")
+    @Query("""
+        SELECT COUNT(*) FROM messages 
+        WHERE hasMedia = 1 
+           OR (localMediaPath IS NOT NULL AND localMediaPath != '')
+           OR (mediaType IS NOT NULL AND mediaType != '')
+    """)
     fun getMediaCount(): Flow<Int>
 
     // Phase 4: Media queries
-    @Query("SELECT * FROM messages WHERE hasMedia = 1 ORDER BY timestamp DESC")
+    @Query("""
+        SELECT * FROM messages 
+        WHERE hasMedia = 1 
+           OR (localMediaPath IS NOT NULL AND localMediaPath != '')
+           OR (mediaType IS NOT NULL AND mediaType != '')
+        ORDER BY timestamp DESC
+    """)
     fun observeAllMedia(): Flow<List<MessageEntity>>
 
     @Query("SELECT * FROM messages WHERE hasMedia = 1 AND mediaType = :type ORDER BY timestamp DESC")
